@@ -495,7 +495,7 @@ class LocalAPI(object):
     def _delete_servicechain_instance(self, plugin_context, sci_id):
         try:
             self._delete_resource(self._servicechain_plugin, plugin_context,
-                                  'servicechain_instance', sci_id, False)
+                                  'servicechain_instance', sci_id)
         except sc_ext.ServiceChainInstanceNotFound:
             LOG.warn(_("servicechain %s already deleted"), sci_id)
 
