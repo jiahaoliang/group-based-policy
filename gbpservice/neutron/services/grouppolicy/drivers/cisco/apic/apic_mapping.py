@@ -349,9 +349,9 @@ class ApicMappingDriver(api.ResourceMappingDriver):
             if classifier['protocol']:
                 attrs['etherT'] = 'ip'
                 attrs['prot'] = classifier['protocol'].lower()
-                if port_min and port_max:
-                    attrs['dToPort'] = port_max
-                    attrs['dFromPort'] = port_min
+            if port_min and port_max:
+                attrs['dToPort'] = port_max
+                attrs['dFromPort'] = port_min
             tenant = self._tenant_by_sharing_policy(context.current)
             policy_rule = self.name_mapper.policy_rule(context,
                                                        context.current)
@@ -557,9 +557,6 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                 for es in ess:
                     self._plug_l3p_to_es(context, es)
 
-    def delete_policy_rule_set_precommit(self, context):
-        pass
-
     def delete_policy_rule_postcommit(self, context):
         for prs in context._plugin.get_policy_rule_sets(
                 context._plugin_context,
@@ -579,6 +576,9 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                 context, context.current, prefix=REVERSE_PREFIX)
             self.apic_manager.delete_tenant_filter(policy_rule, owner=tenant,
                                                    transaction=trs)
+
+    def delete_policy_rule_set_precommit(self, context):
+        pass
 
     def delete_policy_rule_set_postcommit(self, context):
         if not self.name_mapper._is_apic_reference(context.current):
@@ -1131,7 +1131,7 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                             contract, contract, policy_rule, owner=tenant,
                             transaction=trs, unset=unset,
                             rule_owner=rule_owner)
-                        if (classifier['protocol'].lower() in
+			if (classifier.get('protocol') and classifier['protocol'].lower() in
                                 REVERTIBLE_PROTOCOLS):
                             (self.apic_manager.
                              manage_contract_subject_out_filter(
@@ -1144,7 +1144,7 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                             contract, contract, policy_rule, owner=tenant,
                             transaction=trs, unset=unset,
                             rule_owner=rule_owner)
-                        if (classifier['protocol'].lower() in
+			if (classifier.get('protocol') and classifier['protocol'].lower() in
                                 REVERTIBLE_PROTOCOLS):
                             (self.apic_manager.
                              manage_contract_subject_in_filter(
