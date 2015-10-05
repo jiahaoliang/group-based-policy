@@ -557,6 +557,9 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                 for es in ess:
                     self._plug_l3p_to_es(context, es)
 
+    def delete_policy_rule_set_precommit(self, context):
+        pass
+
     def delete_policy_rule_postcommit(self, context):
         for prs in context._plugin.get_policy_rule_sets(
                 context._plugin_context,
