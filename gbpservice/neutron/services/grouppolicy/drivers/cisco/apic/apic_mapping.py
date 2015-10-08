@@ -210,12 +210,14 @@ class ApicMappingDriver(api.ResourceMappingDriver):
         ptg, pt = self._port_id_to_ptg(context, port['id'])
         context._plugin = self.gbp_plugin
         context._plugin_context = context
+        switched = False
         if pt and pt['description'].startswith(PROXY_PORT_PREFIX):
             new_id = pt['description'].replace(
                 PROXY_PORT_PREFIX, '').rstrip(' ')
             LOG.debug("Replace port %s with port %s", port_id, new_id)
             port = self._get_port(context, new_id)
             ptg, pt = self._port_id_to_ptg(context, port['id'])
+            switched = True
 
         l2p = self._network_id_to_l2p(context, port['network_id'])
         if not ptg and not l2p:
@@ -252,6 +254,8 @@ class ApicMappingDriver(api.ResourceMappingDriver):
                    'extra_ips': [],
                    'floating_ip': [],
                    'ip_mapping': []}
+        if switched:
+            details['fixed_ips'] = port['fixed_ips']
         if port['device_owner'].startswith('compute:') and port['device_id']:
             vm = nclient.NovaClient().get_server(port['device_id'])
             details['vm-name'] = vm.name if vm else port['device_id']
@@ -716,8 +720,10 @@ class ApicMappingDriver(api.ResourceMappingDriver):
         self._update_cluster_membership(
             context, new_cluster_id=context.current['cluster_id'],
             old_cluster_id=context.original['cluster_id'])
-        if (context.original['policy_target_group_id'] !=
-                context.current['policy_target_group_id']):
+        curr, orig = context.current, context.original
+        if ((orig['policy_target_group_id'] != curr['policy_target_group_id'])
+            or ((curr['description'] != orig['description']) and
+                curr['description'].startswith(PROXY_PORT_PREFIX))):
             self._notify_port_update(context._plugin_context,
                                      context.current['port_id'])
 
