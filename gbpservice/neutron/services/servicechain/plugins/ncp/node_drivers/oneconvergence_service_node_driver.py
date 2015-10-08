@@ -823,6 +823,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
         if not provider_cidr:
             raise # Raise proper exception object
         service_type = context.current_profile['service_type']
+        service_vendor, _ = self._get_vendor_ha_enabled(
+            context.current_profile)
 
         stack_template = context.current_node.get('config')
         stack_template = (jsonutils.loads(stack_template) if
@@ -901,16 +903,19 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
                     provider_cidr + ";user_access_ip=" +
                     stitching_port_fip + ";fixed_ip=" +
                     consumer_port['fixed_ips'][0]['ip_address'] +
-                    'standby_fip=' + mgmt_fips.get('standby_mgmt_fip', ""))
+                    ';standby_fip=' + mgmt_fips.get('standby_mgmt_fip', "") +
+		            ';service_vendor=' + service_vendor)
             stack_params['ServiceDescription'] = desc
 
         for parameter in stack_template.get(parameters_key) or []:
             if parameter in config_param_values:
                 stack_params[parameter] = config_param_values[parameter]
 
-        LOG.info(_("Final stack_template : %(template)s, stack_params : "
-                   "%(param)s"), {'template': stack_template,
-                                  'param': stack_params})
+        #LOG.info(_("Final stack_template : %(template)s, stack_params : "
+        #           "%(param)s"), {'template': stack_template,
+        #                          'param': stack_params})
+        LOG.info("Final stack_template : %s, stack_params : %s" % 
+                     (stack_template, stack_params))
         return (stack_template, stack_params)
 
     def _get_all_heat_resource_keys(self, template_resource_dict,
