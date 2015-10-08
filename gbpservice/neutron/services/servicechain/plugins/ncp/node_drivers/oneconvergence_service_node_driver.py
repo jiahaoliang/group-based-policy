@@ -887,6 +887,10 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
             l3p = context.gbp_plugin.get_l3_policy(
                 context.plugin_context, l2p['l3_policy_id'])
             config_param_values['RouterId'] = l3p['routers'][0]
+            stitching_subnet = context.core_plugin.get_subnet(
+                                  context._plugin_context, 
+                                  consumer_port['fixed_ips'][0]['subnet_id'])
+            stitching_cidr = stitching_subnet['cidr']
             if not update:
                 fip = self._allocate_floating_ip(
                     context, consumer_port['id'], l3p)
@@ -904,7 +908,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
                     stitching_port_fip + ";fixed_ip=" +
                     consumer_port['fixed_ips'][0]['ip_address'] +
                     ';standby_fip=' + mgmt_fips.get('standby_mgmt_fip', "") +
-		            ';service_vendor=' + service_vendor)
+                    ';service_vendor=' + service_vendor +
+                    ';stitching_cidr=' + stitching_cidr)
             stack_params['ServiceDescription'] = desc
 
         for parameter in stack_template.get(parameters_key) or []:
