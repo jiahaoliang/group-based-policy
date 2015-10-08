@@ -901,7 +901,7 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
                     provider_cidr + ";user_access_ip=" +
                     stitching_port_fip + ";fixed_ip=" +
                     consumer_port['fixed_ips'][0]['ip_address'] +
-                    'standby_fip=' + mgmt_fips.get('standby_mgmt_fip'))
+                    'standby_fip=' + mgmt_fips.get('standby_mgmt_fip', ""))
             stack_params['ServiceDescription'] = desc
 
         for parameter in stack_template.get(parameters_key) or []:
