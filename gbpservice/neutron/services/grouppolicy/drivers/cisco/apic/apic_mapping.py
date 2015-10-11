@@ -2103,7 +2103,7 @@ class ApicMappingDriver(api.ResourceMappingDriver):
     def _check_fip_in_use_in_es(self, context, l3p, ess_id):
         admin_ctx = nctx.get_admin_context()
         port_id = self._get_ports_in_l3policy(context, l3p)
-        fips = self._get_fips(admin_ctx, filters={'port_id': port_id})proxy
+        fips = self._get_fips(admin_ctx, filters={'port_id': port_id})
         fip_net = set([x['floating_network_id'] for x in fips])
 
         ess = context._plugin.get_external_segments(admin_ctx,
