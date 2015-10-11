@@ -257,6 +257,11 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
     def delete(self, context):
         context._plugin_context = self._get_resource_owner_context(
             context._plugin_context)
+        _, ha_enabled = self._get_vendor_ha_enabled(
+            context.current_profile)
+        if ha_enabled:
+            service_targets = self._get_service_targets(context)
+            self._clear_service_target_cluster(context, service_targets)
         provider_tenant_id = context.provider['tenant_id']
         try:
             stack_ids = self._get_node_instance_stacks(
@@ -428,7 +433,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
             context, 'provider')
         consumer_service_targets = self._get_service_target_from_relations(
             context, 'consumer')
-        LOG.info("provider targets: %s consumer targets %s" %(provider_service_targets, consumer_service_targets))
+        LOG.info("provider targets: %s consumer targets %s" % (
+            provider_service_targets, consumer_service_targets))
         if (not provider_service_targets or (service_type in
             [pconst.FIREWALL, pconst.VPN] and not consumer_service_targets)):
                 LOG.error(_("Service Targets are not created for the Node "
@@ -445,7 +451,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
                 LOG.error(_("Service Targets are not created for the Node"))
                 raise Exception("Service Targets are not created for the Node")
 
-        service_target_info = {'provider_ports': []}
+        service_target_info = {'provider_ports': [], 'provider_pts': [],
+                               'consumer_ports': [], 'consumer_pts': []}
         for service_target in provider_service_targets:
             policy_target = context.gbp_plugin.get_policy_target(
                 context.plugin_context, service_target.policy_target_id)
@@ -453,11 +460,12 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
                 context.plugin_context, policy_target['port_id'])
             if policy_target['group_default_gateway'] is True and is_ha_enabled:
                 service_target_info['provider_vip_port'] = port
+                service_target_info['provider_vip_pt'] = policy_target['id']
             else:
                 service_target_info['provider_ports'].append(port)
+                service_target_info['provider_pts'].append(policy_target['id'])
 
         ha_port_processed = False
-        service_target_info['consumer_ports'] = []
         for service_target in consumer_service_targets:
             policy_target = context.gbp_plugin.get_policy_target(
                 context.plugin_context, service_target.policy_target_id)
@@ -466,8 +474,10 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
             if is_ha_enabled and not ha_port_processed:
                 ha_port_processed = True
                 service_target_info['consumer_vip_port'] = port
+                service_target_info['consumer_vip_pt'] = policy_target['id']
             else:
                 service_target_info['consumer_ports'].append(port)
+                service_target_info['consumer_pts'].append(policy_target['id'])
 
         return service_target_info
 
@@ -686,6 +696,32 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
             LOG.exception(_("Floating allocation failed"))
             raise FloatingIPCreationFailedForVPN()
 
+    def _clear_service_target_cluster(self, context, service_targets):
+        for pt_id in service_targets['provider_pts']:
+            updated_pt = {'cluster_id': ""}
+            context.gbp_plugin.update_policy_target(
+                context.plugin_context, pt_id,
+                {'policy_target': updated_pt})
+        for pt_id in service_targets['consumer_pts']:
+            updated_pt = {'cluster_id': ""}
+            context.gbp_plugin.update_policy_target(
+                context.plugin_context, pt_id,
+                {'policy_target': updated_pt})
+
+    def _set_cluster_in_pts(self, context, service_targets):
+        for pt_id in service_targets['provider_pts']:
+            updated_pt = {'cluster_id': service_targets[
+                'provider_vip_pt']}
+            context.gbp_plugin.update_policy_target(
+                context.plugin_context, pt_id,
+                {'policy_target': updated_pt})
+        for pt_id in service_targets['consumer_pts']:
+            updated_pt = {'cluster_id': service_targets[
+                'consumer_vip_pt']}
+            context.gbp_plugin.update_policy_target(
+                context.plugin_context, pt_id,
+                {'policy_target': updated_pt})
+
     def _instantiate_servicevm(self, context):
         service_type = context.current_profile['service_type']
         sc_instance = context.instance
@@ -708,6 +744,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
 
         service_vendor, ha_enabled = self._get_vendor_ha_enabled(
             context.current_profile)
+        if ha_enabled:
+            self._set_cluster_in_pts(context, service_targets)
         provider_l2p_subnets = context.core_plugin.get_subnets(
             context.plugin_context, filters={'id': context.provider['subnets']})
         provider_cidr = None

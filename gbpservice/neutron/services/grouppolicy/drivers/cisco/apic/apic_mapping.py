@@ -262,7 +262,7 @@ class ApicMappingDriver(api.ResourceMappingDriver):
             l3_policy = context._plugin.get_l3_policy(context,
                                                       l2p['l3_policy_id'])
             details['floating_ip'], details['ip_mapping'] = (
-                self._get_ip_mapping_details(context, port_id, l3_policy))
+                self._get_ip_mapping_details(context, port['id'], l3_policy))
         self._add_network_details(context, port, details)
         self._add_vrf_details(context, details)
         is_chain_end = bool(pt and pt.get('proxy_gateway') and
@@ -2103,7 +2103,7 @@ class ApicMappingDriver(api.ResourceMappingDriver):
     def _check_fip_in_use_in_es(self, context, l3p, ess_id):
         admin_ctx = nctx.get_admin_context()
         port_id = self._get_ports_in_l3policy(context, l3p)
-        fips = self._get_fips(admin_ctx, filters={'port_id': port_id})
+        fips = self._get_fips(admin_ctx, filters={'port_id': port_id})proxy
         fip_net = set([x['floating_network_id'] for x in fips])
 
         ess = context._plugin.get_external_segments(admin_ctx,
@@ -2181,8 +2181,15 @@ class ApicMappingDriver(api.ResourceMappingDriver):
         proxy_pts = self._gbp_plugin.get_policy_targets(
             plugin_context, {'policy_target_group_id': [group_id],
                              'proxy_gateway': [True]})
-        ports = self._get_ports(plugin_context,
-                                {'id': [x['port_id'] for x in proxy_pts]})
+        # Get all the fake PTs pointing to the proxy ones to update their ports 
+        pointing_pts = self._gbp_plugin.get_policy_targets(
+            plugin_context.elevated(),
+            {'description': [PROXY_PORT_PREFIX + x['port_id'] for x in
+                             proxy_pts]})
+        ports = self._get_ports(
+            plugin_context,
+            {'id': [x['port_id'] for x in (proxy_pts + pointing_pts)]})
+
         for port in ports:
             if self._is_port_bound(port):
                 self._notify_port_update(plugin_context, port['id'])
