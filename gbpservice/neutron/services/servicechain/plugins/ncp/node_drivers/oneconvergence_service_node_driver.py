@@ -425,7 +425,6 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
         return service_targets
 
     def _get_service_targets(self, context):
-        #import pdb;pdb.set_trace()
         service_type = context.current_profile['service_type']
         service_vendor, is_ha_enabled = self._get_vendor_ha_enabled(
             context.current_profile)
@@ -770,7 +769,8 @@ class OneConvergenceServiceNodeDriver(heat_node_driver.HeatNodeDriver):
             'stitching_gateway_ip': "192.168.0.0",
         }
 
-        active_service_ports = standby_service_ports = {}
+        active_service_ports = {}
+        standby_service_ports = {}
         active_service_ports['provider_port_id'] = service_targets[
             'provider_ports'][0]['id']
         if service_targets.get('consumer_ports'):
