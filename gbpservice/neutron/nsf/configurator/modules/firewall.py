@@ -34,7 +34,7 @@ LOG = logging.getLogger(__name__)
 
 class FwaasRpcReceiver(object):
     """
-    This class implements requests to configure VYOS FW specific services.
+    APIs for receiving RPC messages from Firewall plugin.
     """
     RPC_API_VERSION = '1.0'
     target = messaging.Target(version=RPC_API_VERSION)
@@ -42,10 +42,6 @@ class FwaasRpcReceiver(object):
     def __init__(self, conf, sc):
         self.conf = conf
         self._sc = sc
-
-    def init_host(self):
-        ev = self._sc.event(id='INIT_HOST', data='')
-        self._sc.poll_event(ev)
 
     def configure_firewall(self, context, firewall):
         arg_dict = {'context': context,
@@ -67,6 +63,9 @@ class FwaasRpcReceiver(object):
 
 
 class FwGenericConfigRpcReceiver(object):
+    """
+    APIs for receiving RPC messages from Orchestrator.
+    """
     RPC_API_VERSION = '1.0'
     target = messaging.Target(version=RPC_API_VERSION)
 
@@ -151,7 +150,8 @@ class FwGenericConfigRpcReceiver(object):
 
 class FwGenericConfigHandler(object):
     """
-    This class implements requests to configure VYOS services.
+    Handler class for demultiplexing firewall configuration
+    requests from Orchestrator and sending to appropriate driver.
     """
 
     def __init__(self, sc, drivers):
@@ -160,9 +160,7 @@ class FwGenericConfigHandler(object):
 
     def _get_driver(self, data):
         ''' TO DO: Do demultiplexing logic based on vendor
-
-            # LOGIC
-
+                   when a different vendor comes.
         '''
         return self.drivers["vyos_config"]
 
@@ -205,8 +203,8 @@ class FwGenericConfigHandler(object):
 class FwaasRpcSender(object):
     """ RPC APIs to FWaaS Plugin.
     """
-
     RPC_API_VERSION = '1.0'
+    target = messaging.Target(version=RPC_API_VERSION)
 
     def __init__(self, topic, host):
         ''' [DEE]: Modified according to the inheriting library (RPC/filter)
@@ -230,6 +228,10 @@ class FwaasRpcSender(object):
 
 
 class FwaasHandler(manager.Manager):
+    """
+    Handler class for demultiplexing firewall configuration
+    requests from Fwaas Plugin and sending to appropriate driver.
+    """
 
     def __init__(self, sc, drivers):
         self._sc = sc
@@ -237,28 +239,9 @@ class FwaasHandler(manager.Manager):
 
     def _get_driver(self, data):
         ''' TO DO: Do demultiplexing logic based on vendor
-
-            # LOGIC
-
+                   when a new vendor comes.
         '''
-        return self.drivers['vyos_fwaas']
-
-    def handle_poll_event(self, ev):
-        try:
-            msg = ("Worker process with ID: %s starting "
-                   "to handle task: %s for poll event of topic: %s. "
-                   % (os.getpid(), ev.id, const.FIREWALL_RPC_TOPIC))
-            LOG.debug(msg)
-
-            if ev.id == 'INIT_HOST':
-                self._init_host(ev)
-            else:
-                msg = ("Wrong poll event call for firewall.")
-                LOG.error(msg)
-                raise Exception(msg)
-        except Exception as err:
-            LOG.error("Failed to perform the poll operation: %s. %s"
-                      % (ev.id, str(err).capitalize()))
+        return self.drivers['vyos_fwaas']()
 
     def handle_event(self, ev):
         try:
@@ -332,14 +315,13 @@ def events_init(sc, drivers):
 def load_drivers():
     ''' Create object of firewall drivers
     '''
-    drivers = {"vyos_fwaas": FwaasDriver(),
-               "vyos_config": FwGenericConfigDriver()}
+    drivers = {"vyos_fwaas": 'FwaasDriver',
+               "vyos_config": 'FwGenericConfigDriver'}
     return drivers
 
 
 def module_init(sc, conf):
     drivers = load_drivers()
-
     try:
         events_init(sc, drivers)
     except Exception as err:

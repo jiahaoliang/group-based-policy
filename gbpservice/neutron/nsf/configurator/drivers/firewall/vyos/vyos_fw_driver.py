@@ -19,7 +19,6 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from neutron import context
-from neutron.agent import rpc as agent_rpc
 
 from gbpservice.neutron.nsf.configurator.lib import fw_constants as const
 from gbpservice.neutron.nsf.configurator.modules.firewall import FwaasRpcSender
@@ -29,25 +28,26 @@ LOG = logging.getLogger(__name__)
 
 class FwGenericConfigDriver(object):
     """
-    This class implements requests to configure VYOS generic services.
+    Driver class for implementing firewall configuration
+    requests from Orchestrator.
     """
 
     def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
 
-    def _configure_interfaces(self,  ev):
+    def configure_interfaces(self,  ev):
         pass
 
-    def _clear_interfaces(self, ev):
+    def clear_interfaces(self, ev):
         pass
 
-    def _configure_license(self, ev):
+    def configure_license(self, ev):
         pass
 
-    def _release_license(self, ev):
+    def release_license(self, ev):
         pass
 
-    def _configure_source_routes(self, ev):
+    def configure_source_routes(self, ev):
 
         vm_mgmt_ip = ev.data.get('vm_mgmt_ip')
         source_cidrs = ev.data.get('source_cidrs')
@@ -106,7 +106,7 @@ class FwGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def _delete_source_routes(self, ev):
+    def delete_source_routes(self, ev):
 
         vm_mgmt_ip = ev.data.get('vm_mgmt_ip')
         source_cidrs = ev.data.get('source_cidrs')
@@ -149,7 +149,7 @@ class FwGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def _add_persistent_rule(self, ev):
+    def add_persistent_rule(self, ev):
 
         kwargs = ev.data.get('kwargs')
         if not kwargs:
@@ -207,7 +207,7 @@ class FwGenericConfigDriver(object):
                                    rule_info['tenant_id']))
         LOG.info(msg)
 
-    def _delete_persistent_rule(self, ev):
+    def delete_persistent_rule(self, ev):
 
         kwargs = ev.data.get('kwargs')
         if not kwargs:
@@ -267,9 +267,12 @@ class FwGenericConfigDriver(object):
 
 
 class FwaasDriver(object):
+    """
+    Driver class for implementing firewall configuration
+    requests from Fwaas Plugin.
+    """
 
-    def __init__(self, sc):
-        self._sc = sc
+    def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
         self.host = cfg.CONF.host
         self.plugin_rpc = FwaasRpcSender(
@@ -277,11 +280,6 @@ class FwaasDriver(object):
             self.host)
         self.context = context.get_admin_context_without_session()
         self.oc_fwaas_enabled = cfg.CONF.ocfwaas.enabled
-        self.agent_state = None
-        self.use_call = True
-        self.state_rpc = agent_rpc.PluginReportStateAPI(
-            const.OC_FW_PLUGIN_TOPIC)
-        self.report_interval = cfg.CONF.ocfwaas.oc_report_interval
 
         if not self.oc_fwaas_enabled:
             msg = ("FWaaS not enabled in configuration file")
@@ -441,7 +439,7 @@ class FwaasDriver(object):
             '''ENQUEUE: return self.plugin_rpc.firewall_deleted(context,
                                                           firewall['id'])'''
             msg = ("Deleted Firewall.")
-            LOG.emit("info", msg)
+            LOG.info(msg)
         try:
             vm_mgmt_ip = self._get_firewall_attribute(firewall)
             url = const.request_url % (vm_mgmt_ip,
