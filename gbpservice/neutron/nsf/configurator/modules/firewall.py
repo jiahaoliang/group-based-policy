@@ -17,8 +17,6 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
-from neutron import manager
-
 from gbpservice.neutron.nsf.configurator.lib import fw_constants as const
 from gbpservice.neutron.nsf.core.main import Event
 from gbpservice.neutron.nsf.core.main import RpcAgent
@@ -32,34 +30,33 @@ from gbpservice.neutron.nsf.configurator.drivers.firewall.\
 LOG = logging.getLogger(__name__)
 
 
-class FwaasRpcReceiver(object):
-    """
-    APIs for receiving RPC messages from Firewall plugin.
+class FwaasRpcSender(object):
+    """ RPC APIs to FWaaS Plugin.
     """
     RPC_API_VERSION = '1.0'
     target = messaging.Target(version=RPC_API_VERSION)
 
-    def __init__(self, conf, sc):
-        self.conf = conf
-        self._sc = sc
+    def __init__(self, topic, host):
+        ''' [DEE]: Modified according to the inheriting library (RPC/filter)
+        super(FwPluginApi,
+              self).__init__(topic=topic,
+                             default_version=self.RPC_API_VERSION)
+        '''
+        self.host = host
 
-    def configure_firewall(self, context, firewall):
-        arg_dict = {'context': context,
-                    'firewall': firewall}
-        ev = self._sc.event(id='CONFIGURE_FW', data=arg_dict)
-        self._sc.rpc_event(ev)
+    def set_firewall_status(self, context, firewall_id, status):
+        """Make a RPC to set the status of a firewall."""
+        '''ENQUEUE:return self.call(context,
+                         self.make_msg('set_firewall_status', host=self.host,
+                                       firewall_id=firewall_id, status=status))
+        '''
 
-    def update_firewall(self, context, firewall):
-        arg_dict = {'context': context,
-                    'firewall': firewall}
-        ev = self._sc.event(id='UPDATE_FW', data=arg_dict)
-        self._sc.rpc_event(ev)
-
-    def delete_firewall(self, context, firewall):
-        arg_dict = {'context': context,
-                    'firewall': firewall}
-        ev = self._sc.event(id='DELETE_FW', data=arg_dict)
-        self._sc.rpc_event(ev)
+    def firewall_deleted(self, context, firewall_id):
+        """Make a RPC to indicate that the firewall resources are deleted."""
+        '''ENQUEUE:return self.call(context,
+                         self.make_msg('firewall_deleted', host=self.host,
+                                       firewall_id=firewall_id))
+        '''
 
 
 class FwGenericConfigRpcReceiver(object):
@@ -152,6 +149,7 @@ class FwGenericConfigHandler(object):
     """
     Handler class for demultiplexing firewall configuration
     requests from Orchestrator and sending to appropriate driver.
+
     """
 
     def __init__(self, sc, drivers):
@@ -168,31 +166,13 @@ class FwGenericConfigHandler(object):
         try:
             msg = ("Worker process with ID: %s starting "
                    "to handle task: %s of topic: %s. "
-                   % (os.getpid(), ev.id, const.VYOS_FIREWALL_RPC_TOPIC))
+                   % (os.getpid(), ev.id,
+                      const.FIREWALL_GENERIC_CONFIG_RPC_TOPIC))
             LOG.debug(msg)
 
             driver = self._get_driver(ev.data)
-
-            if ev.id == 'CONFIGURE_INTERFACES':
-                driver.configure_interfaces(ev)
-            elif ev.id == 'CLEAR_INTERFACES':
-                driver.clear_interfaces(ev)
-            elif ev.id == 'CONFIGURE_LICENSE':
-                driver.configure_license(ev)
-            elif ev.id == 'RELEASE_LICENSE':
-                driver.release_license(ev),
-            elif ev.id == 'CONFIGURE_SOURCE_ROUTES':
-                driver.configure_source_routes(ev)
-            elif ev.id == 'DELETE_SOURCE_ROUTES':
-                driver.delete_source_routes(ev)
-            elif ev.id == 'ADD_PERSISTENT_RULE':
-                driver.add_persistent_rule(ev)
-            elif ev.id == 'DEL_PERSISTENT_RULE':
-                driver.del_persistent_rule(ev)
-            else:
-                msg = ("Wrong call to configure VYOS FIREWALL.")
-                LOG.error(msg)
-                raise Exception(msg)
+            method = getattr(driver, "%s" % (ev.id.lower()))
+            method(ev)
         except Exception as err:
             LOG.error("Failed to perform the operation: %s. %s"
                       % (ev.id, str(err).capitalize()))
@@ -200,34 +180,37 @@ class FwGenericConfigHandler(object):
             self._sc.event_done(ev)
 
 
-class FwaasRpcSender(object):
-    """ RPC APIs to FWaaS Plugin.
+class FwaasRpcReceiver(object):
+    """
+    APIs for receiving RPC messages from Firewall plugin.
     """
     RPC_API_VERSION = '1.0'
     target = messaging.Target(version=RPC_API_VERSION)
 
-    def __init__(self, topic, host):
-        ''' [DEE]: Modified according to the inheriting library (RPC/filter)
-        super(FwPluginApi,
-              self).__init__(topic=topic,
-                             default_version=self.RPC_API_VERSION)
-        '''
-        self.host = host
+    def __init__(self, conf, sc):
+        self.conf = conf
+        self._sc = sc
 
-    def set_firewall_status(self, context, firewall_id, status):
-        """Make a RPC to set the status of a firewall."""
-        return self.call(context,
-                         self.make_msg('set_firewall_status', host=self.host,
-                                       firewall_id=firewall_id, status=status))
+    def configure_firewall(self, context, firewall):
+        arg_dict = {'context': context,
+                    'firewall': firewall}
+        ev = self._sc.event(id='CONFIGURE_FW', data=arg_dict)
+        self._sc.rpc_event(ev)
 
-    def firewall_deleted(self, context, firewall_id):
-        """Make a RPC to indicate that the firewall resources are deleted."""
-        return self.call(context,
-                         self.make_msg('firewall_deleted', host=self.host,
-                                       firewall_id=firewall_id))
+    def update_firewall(self, context, firewall):
+        arg_dict = {'context': context,
+                    'firewall': firewall}
+        ev = self._sc.event(id='UPDATE_FW', data=arg_dict)
+        self._sc.rpc_event(ev)
+
+    def delete_firewall(self, context, firewall):
+        arg_dict = {'context': context,
+                    'firewall': firewall}
+        ev = self._sc.event(id='DELETE_FW', data=arg_dict)
+        self._sc.rpc_event(ev)
 
 
-class FwaasHandler(manager.Manager):
+class FwaasHandler(object):
     """
     Handler class for demultiplexing firewall configuration
     requests from Fwaas Plugin and sending to appropriate driver.
@@ -251,17 +234,8 @@ class FwaasHandler(manager.Manager):
             LOG.debug(msg)
 
             driver = self._get_driver(ev.data)
-
-            if ev.id == 'CONFIGURE_FW':
-                driver.configure_firewall(ev)
-            elif ev.id == 'UPDATE_FW':
-                driver.update_firewall(ev)
-            elif ev.id == 'DELETE_FW':
-                driver.delete_firewall(ev)
-            else:
-                msg = ("Wrong call to configure firewall.")
-                LOG.error(msg)
-                raise Exception(msg)
+            method = getattr(driver, "%s" % (ev.id.lower()))
+            method(ev)
         except Exception as err:
             LOG.error("Failed to perform the operation: %s. %s"
                       % (ev.id, str(err).capitalize()))
@@ -277,21 +251,23 @@ def _create_rpc_agent(sc, topic, manager):
 
 
 def rpc_init(sc, conf):
-    fwrpcmgr = FwaasRpcReceiver(conf, sc)
-    vyosfwrpcmgr = FwGenericConfigRpcReceiver(conf, sc)
+    fw_rpc_mgr = FwaasRpcReceiver(conf, sc)
+    fw_generic_rpc_mgr = FwGenericConfigRpcReceiver(conf, sc)
 
-    fwagent = _create_rpc_agent(sc, const.FIREWALL_RPC_TOPIC, fwrpcmgr)
-    vyosfwagent = _create_rpc_agent(sc, const.VYOS_FIREWALL_RPC_TOPIC,
-                                    vyosfwrpcmgr)
+    fw_agent = _create_rpc_agent(sc, const.FIREWALL_RPC_TOPIC, fw_rpc_mgr)
+    fw_generic_agent = _create_rpc_agent(
+                                    sc,
+                                    const.FIREWALL_GENERIC_CONFIG_RPC_TOPIC,
+                                    fw_generic_rpc_mgr)
 
-    sc.register_rpc_agents([fwagent, vyosfwagent])
+    sc.register_rpc_agents([fw_agent, fw_generic_agent])
 
 
 def events_init(sc, drivers):
     evs = [
-        Event(id='CONFIGURE_FW', handler=FwaasHandler(sc, drivers)),
-        Event(id='UPDATE_FW', handler=FwaasHandler(sc, drivers)),
-        Event(id='DELETE_FW', handler=FwaasHandler(sc, drivers)),
+        Event(id='CONFIGURE_FIREWALL', handler=FwaasHandler(sc, drivers)),
+        Event(id='UPDATE_FIREWALL', handler=FwaasHandler(sc, drivers)),
+        Event(id='DELETE_FIREWALL', handler=FwaasHandler(sc, drivers)),
 
         Event(id='CONFIGURE_INTERFACES', handler=FwGenericConfigHandler(
                                                                 sc, drivers)),
@@ -313,15 +289,25 @@ def events_init(sc, drivers):
 
 
 def load_drivers():
-    ''' Create object of firewall drivers
+    ''' Create objects of firewall drivers.
+
+        TODO: We need to make load_drivers() work by dynamic class detection
+        from the driver directory and instantiate objects out of it.
     '''
-    drivers = {"vyos_fwaas": 'FwaasDriver',
-               "vyos_config": 'FwGenericConfigDriver'}
+    drivers = {"vyos_fwaas": FwaasDriver(),
+               "vyos_config": FwGenericConfigDriver()}
     return drivers
 
 
 def module_init(sc, conf):
-    drivers = load_drivers()
+    try:
+        drivers = load_drivers()
+    except Exception as err:
+        LOG.error("Failed to load drivers. %s"
+                  % (str(err).capitalize()))
+        raise err
+    else:
+        LOG.debug("Loaded drivers successfully.")
     try:
         events_init(sc, drivers)
     except Exception as err:
@@ -333,7 +319,7 @@ def module_init(sc, conf):
 
     msg = ("RPC topics are: %s and %s."
            % (const.FIREWALL_RPC_TOPIC,
-              const.VYOS_FIREWALL_RPC_TOPIC))
+              const.FIREWALL_GENERIC_CONFIG_RPC_TOPIC))
     try:
         rpc_init(sc, conf)
     except Exception as err:
@@ -343,5 +329,5 @@ def module_init(sc, conf):
     else:
         LOG.debug("RPC initialization successful. " + msg)
 
-    msg = ("VYOS FIREWALL module initialized.")
+    msg = ("FIREWALL as a Service Module Initialized.")
     LOG.info(msg)
