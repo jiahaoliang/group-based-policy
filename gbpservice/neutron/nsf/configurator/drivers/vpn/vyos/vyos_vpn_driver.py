@@ -37,31 +37,18 @@ class VpnGenericConfigDriver(object):
     def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
 
-    def configure_interfaces(self,  ev):
+    def configure_interfaces(self, context, kwargs):
         pass
 
-    def clear_interfaces(self, ev):
+    def clear_interfaces(self, context, vm_mgmt_ip, service_vendor,
+                         provider_interface_position,
+                         stitching_interface_position):
         pass
 
-    def configure_license(self, ev):
-        pass
+    def configure_source_routes(self, context, vm_mgmt_ip, service_vendor,
+                                source_cidrs, destination_cidr, gateway_ip,
+                                provider_interface_position):
 
-    def release_license(self, ev):
-        pass
-
-    def configure_source_routes(self, ev):
-
-        vm_mgmt_ip = ev.data.get('vm_mgmt_ip')
-        source_cidrs = ev.data.get('source_cidrs')
-        destination_cidr = ev.data.get('destination_cidr')
-        gateway_ip = ev.data.get('gateway_ip')
-        provider_interface_position = ev.data.get(
-                                        'provider_interface_position')
-
-        if not (vm_mgmt_ip and source_cidrs and destination_cidr and
-                gateway_ip and provider_interface_position):
-            msg = ("Parameters missing for VPN source route configuration.")
-            raise Exception(msg)
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
 
@@ -108,16 +95,9 @@ class VpnGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def delete_source_routes(self, ev):
+    def delete_source_routes(self, context, vm_mgmt_ip, service_vendor,
+                             source_cidrs, provider_interface_position):
 
-        vm_mgmt_ip = ev.data.get('vm_mgmt_ip')
-        source_cidrs = ev.data.get('source_cidrs')
-        provider_interface_position = ev.data.get(
-                                        'provider_interface_position')
-
-        if not (vm_mgmt_ip and source_cidrs and provider_interface_position):
-            msg = ("Parameters missing for VPN source routes deletion.")
-            raise Exception(msg)
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
         active_configured = False
@@ -151,12 +131,7 @@ class VpnGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def add_persistent_rule(self, ev):
-
-        kwargs = ev.data.get('kwargs')
-        if not kwargs:
-            msg = ("Parameters missing for VPN persistent rule addition.")
-            raise Exception(msg)
+    def add_persistent_rule(self, context, kwargs):
 
         rule_info = kwargs['rule_info']
 
@@ -209,12 +184,7 @@ class VpnGenericConfigDriver(object):
                                    rule_info['tenant_id']))
         LOG.info(msg)
 
-    def delete_persistent_rule(self, ev):
-
-        kwargs = ev.data.get('kwargs')
-        if not kwargs:
-            msg = ("Parameters missing for VPN persistent rule deletion.")
-            raise Exception(msg)
+    def delete_persistent_rule(self, context, kwargs):
 
         rule_info = kwargs['rule_info']
 

@@ -369,24 +369,6 @@ class VpnGenericConfigRpcReceiver(object):
         ev = self._sc.event(id='CLEAR_INTERFACES', data=arg_dict)
         self._sc.rpc_event(ev)
 
-    def configure_license(self, context, vm_mgmt_ip,
-                          service_vendor, license_key):
-        arg_dict = {'context': context,
-                    'vm_mgmt_ip': vm_mgmt_ip,
-                    'service_vendor': service_vendor,
-                    'license_key': license_key}
-        ev = self._sc.event(id='CONFIGURE_LICENSE', data=arg_dict)
-        self._sc.rpc_event(ev)
-
-    def release_license(self, context, vm_mgmt_ip,
-                        service_vendor, license_key):
-        arg_dict = {'context': context,
-                    'vm_mgmt_ip': vm_mgmt_ip,
-                    'service_vendor': service_vendor,
-                    'license_key': license_key}
-        ev = self._sc.event(id='RELEASE_LICENSE', data=arg_dict)
-        self._sc.rpc_event(ev)
-
     def configure_source_routes(self, context, vm_mgmt_ip, service_vendor,
                                 source_cidrs, destination_cidr, gateway_ip,
                                 provider_interface_position):
@@ -397,8 +379,7 @@ class VpnGenericConfigRpcReceiver(object):
                     'destination_cidr': destination_cidr,
                     'gateway_ip': gateway_ip,
                     'provider_interface_position': (
-                                        provider_interface_position),
-                    'standby_vm_mgmt_ip': None}
+                                        provider_interface_position)}
         ev = self._sc.event(id='CONFIGURE_SOURCE_ROUTES', data=arg_dict)
         self._sc.rpc_event(ev)
 
@@ -415,13 +396,15 @@ class VpnGenericConfigRpcReceiver(object):
 
     def add_persistent_rule(self, context, **kwargs):
         ''' In previous implementation, 'context' is not used '''
-        arg_dict = {'kwargs': kwargs}
+        arg_dict = {'kwargs': kwargs,
+                    'context': context}
         ev = self._sc.event(id='ADD_PERSISTENT_RULE', data=arg_dict)
         self._sc.rpc_event(ev)
 
     def del_persistent_rule(self, context, **kwargs):
         ''' In previous implementation, 'context' is not used '''
-        arg_dict = {'kwargs': kwargs}
+        arg_dict = {'kwargs': kwargs,
+                    'context': context}
         ev = self._sc.event(id='DELETE_PERSISTENT_RULE', data=arg_dict)
         self._sc.rpc_event(ev)
 
@@ -451,9 +434,42 @@ class VpnGenericConfigHandler(object):
                    % (os.getpid(), ev.id, const.VPN_RPC_TOPIC))
             LOG.debug(msg)
 
+            context = ev.data.get('context')
+            kwargs = ev.data.get('kwargs')
+            vm_mgmt_ip = ev.data.get('floating_ip')
+            service_vendor = ev.data.get('service_vendor')
+            source_cidrs = ev.data.get('source_cidrs')
+            destination_cidr = ev.data.get('destination_cidr')
+            gateway_ip = ev.data.get('gateway_ip')
+            provider_interface_position = ev.data.get(
+                                            'provider_interface_position')
+            stitching_interface_position = ev.data.get(
+                                            'stitching_interface_position')
+
             driver = self._get_driver(ev.data)
-            method = getattr(driver, "%s" % (ev.id.lower()))
-            method(ev)
+            if ev.id == 'CONFIGURE_INTERFACES':
+                driver.configure_interfaces(context, kwargs)
+            elif ev.id == 'CLEAR_INTERFACES':
+                driver.clear_interfaces(context, vm_mgmt_ip, service_vendor,
+                                        provider_interface_position,
+                                        stitching_interface_position)
+            elif ev.id == 'CONFIGURE_SOURCE_ROUTES':
+                driver.configure_source_routes(
+                            context, vm_mgmt_ip, service_vendor, source_cidrs,
+                            destination_cidr, gateway_ip,
+                            provider_interface_position)
+            elif ev.id == 'DELETE_SOURCE_ROUTES':
+                driver.delete_source_routes(
+                            context, vm_mgmt_ip, service_vendor, source_cidrs,
+                            provider_interface_position)
+            elif ev.id == 'ADD_PERSISTENT_RULE':
+                driver.add_persistent_rule(context, kwargs)
+            elif ev.id == 'DEL_PERSISTENT_RULE':
+                driver.del_persistent_rule(context, kwargs)
+            else:
+                msg = ("Wrong call from Orchestrator to configure VPNaaS.")
+                LOG.error(msg)
+                raise Exception(msg)
         except Exception as err:
             LOG.error("Failed to perform the operation: %s. %s"
                       % (ev.id, str(err).capitalize()))
