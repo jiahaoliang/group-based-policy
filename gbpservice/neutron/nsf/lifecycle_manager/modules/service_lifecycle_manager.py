@@ -36,13 +36,13 @@ def rpc_init(controller, config):
 
 def events_init(controller, config):
     events = [
-        Event(id='DELETE_NETWORK_SERVICE',
-              handler=ServiceLifeCycleManager(controller)),
         Event(id='CREATE_NETWORK_SERVICE_INSTANCE',
               handler=ServiceLifeCycleManager(controller)),
         Event(id='DELETE_NETWORK_SERVICE_INSTANCE',
               handler=ServiceLifeCycleManager(controller)),
         Event(id='DEVICE_ACTIVE',
+              handler=ServiceLifeCycleManager(controller)),
+        Event(id='DEVICE_DELETED',
               handler=ServiceLifeCycleManager(controller)),
         Event(id='USER_CONFIG_IN_PROGRESS',
               handler=ServiceLifeCycleManager(controller)),
@@ -190,14 +190,16 @@ class ServiceLifeCycleHandler(object):
         provider_port_info = {
             'id': network_service_info['provider_port_id'],
             'port_policy': mode,
-            'port_classification': 'provider'
+            'port_classification': 'provider',
+            'port_type': 'NA'
         }
         network_service_port_info.append(provider_port_info)
         if network_service_info.get('consumer_port_id'):
             consumer_port_info = {
                 'id': network_service_info['consumer_port_id'],
                 'port_policy': mode,
-                'port_classification': 'consumer'
+                'port_classification': 'consumer',
+                'port_type': 'NA'
             }
             network_service_port_info.append(consumer_port_info)
 
@@ -206,7 +208,9 @@ class ServiceLifeCycleHandler(object):
         if mode == 'GBP':
             management_network_info = {
                 'id': network_service_info['management_ptg_id'],
-                'port_policy': mode
+                'port_policy': mode,
+                'port_classification': 'management',
+                'port_type': 'NA'
             }
         create_network_service_instance_request = {
             'network_service': network_service,
@@ -234,10 +238,10 @@ class ServiceLifeCycleHandler(object):
         network_service['status'] = "PENDING_DELETE"
         network_service = self.db_handler.update_network_service(
             self.db_session, network_service_id, network_service)
-        for nsi in network_service_info['network_service_instances']:
+        for nsi_id in network_service_info['network_service_instances']:
             delete_nsi_event = self._controller.event(
                 id='DELETE_NETWORK_SERVICE_INSTANCE',
-                data=nsi['id'])
+                data=nsi_id)
         self._controller.rpc_event(delete_nsi_event)
 
     def create_network_service_instance(self, request_data):
@@ -277,6 +281,7 @@ class ServiceLifeCycleHandler(object):
         }
         nsi = self.db_handler.update_network_service_instance(
             self.db_session, request_data['network_service_instance_id'], nsi)
+        #TODO: return if mode is neutron, and make service as active.
         service_details = self.get_service_details(nsi)
         request_data['heat_stack_id'] = self.config_driver.apply_user_config(
                 service_details) # Heat driver to launch stack
@@ -288,7 +293,8 @@ class ServiceLifeCycleHandler(object):
         nsi = {
             'status': 'DEVICE_CREATE_FAILED',
             'network_service_device_id': request_data[
-                'network_service_device_id']
+                'network_service_device_id'],
+            'network_service_id': 'network_service_id',
         }
         self.db_handler.update_network_service_instance(
             self.db_session, request_data['network_service_instance_id'], nsi)
@@ -357,9 +363,13 @@ class ServiceLifeCycleHandler(object):
         nsi = {'status': 'PENDING_DELETE'}
         nsi = self.db_handler.update_network_service_instance(
             self.db_session, nsi_id, nsi)
+        delete_nsd_request = {
+                'network_service_id': nsi['network_service_id'],
+                'network_service_instance_id': nsi_id,
+                'network_service_device_id': nsi['network_service_device_id']}
         delete_nsd_event = self._controller.event(
             id='DELETE_NETWORK_SERVICE_DEVICE',
-            data=nsi['network_service_device_id'])
+            data=delete_nsd_request)
         self._controller.rpc_event(delete_nsd_event)
 
     def _validate_create_service_input(self, context, create_service_request):

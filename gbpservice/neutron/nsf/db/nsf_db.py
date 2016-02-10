@@ -82,7 +82,7 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
                                     page_reverse=page_reverse)
 
     def _set_port_info_for_nsi(self, session, network_service_instance_db,
-                               network_service_instance):
+                               network_service_instance, is_update=False):
         nsi_db = network_service_instance_db
         port_info = network_service_instance.get('port_info')
         if not port_info:
@@ -96,7 +96,10 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
                     port_policy=port['port_policy'],
                     port_classification=port.get('port_classification'),
                     port_type=port.get('port_type'))
-                session.add(port_info_db)
+                if is_update:
+                    session.add(port_info_db)
+                else:
+                    session.merge(port_info_db)
                 session.flush()  # Any alternatives for flush ??
                 assoc = nsf_db_model.NSIPortAssociation(
                     network_service_instance_id=(
@@ -178,7 +181,7 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
             marker_obj=marker_obj, page_reverse=page_reverse)
 
     def _set_mgmt_ports_for_nsd(self, session, network_service_device_db,
-                                network_service_device):
+                                network_service_device, is_update=False):
         nsd_db = network_service_device_db
         mgmt_data_ports = network_service_device.get('mgmt_data_ports')
         if not mgmt_data_ports:
@@ -192,7 +195,10 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
                     port_policy=port['port_policy'],
                     port_classification=port['port_classification'],
                     port_type=port['port_type'])
-                session.add(port_info_db)
+                if is_update:
+                    session.merge(port_info_db)
+                else:
+                    session.add(port_info_db)
                 assoc = nsf_db_model.NSDPortAssociation(
                     network_service_device_id=network_service_device_db['id'],
                     data_port_id=port['id'])
@@ -201,7 +207,8 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
 
     def _set_ha_monitoring_data_port_for_nsd(self, session,
                                              network_service_device_db,
-                                             network_service_device):
+                                             network_service_device,
+                                             is_update=False):
         nsd_db = network_service_device_db
         ha_monitoring_data_port = network_service_device.get(
             'ha_monitoring_data_port')
@@ -215,14 +222,18 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
                 port_classification=ha_monitoring_data_port[
                     'port_classification'],
                 port_type=ha_monitoring_data_port['port_type'])
-            session.add(port_info_db)
+            if is_update:
+                session.add(port_info_db)
+            else:
+                session.merge(port_info_db)
             session.flush()
             nsd_db.ha_monitoring_data_port = ha_monitoring_data_port['id']
             del network_service_device['ha_monitoring_data_port']
 
     def _set_ha_monitoring_data_network_for_nsd(self, session,
                                                 network_service_device_db,
-                                                network_service_device):
+                                                network_service_device,
+                                                is_update=False):
         nsd_db = network_service_device_db
         ha_monitoring_data_network = network_service_device.get(
             'ha_monitoring_data_network')
@@ -233,7 +244,10 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
             network_info_db = nsf_db_model.NetworkInfo(
                 id=ha_monitoring_data_network['id'],
                 network_policy=ha_monitoring_data_network['network_policy'])
-            session.add(network_info_db)
+            if is_update:
+                session.add(network_info_db)
+            else:
+                session.merge(network_info_db)
             session.flush()
             nsd_db.ha_monitoring_data_network = (
                 ha_monitoring_data_network['id'])
@@ -280,7 +294,7 @@ class NSFDbBase(common_db_mixin.CommonDbMixin):
                 self._set_mgmt_ports_for_nsd(
                     session,
                     network_service_device_db,
-                    updated_network_service_device)
+                    updated_network_service_device, True)
             if 'ha_monitoring_data_port' in updated_network_service_device:
                 self._set_ha_monitoring_data_port_for_nsd(
                     session,
