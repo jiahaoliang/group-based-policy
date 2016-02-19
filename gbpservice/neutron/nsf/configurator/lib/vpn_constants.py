@@ -11,8 +11,11 @@
 # strictly forbidden unless prior written permission is obtained from
 # One Convergence, Inc., USA
 
-SERVICE_TYPE_IPSEC = 'ipsec'
-SERVICE_TYPE_OPENVPN = 'openvpn'
+
+DRIVERS_DIR = '/usr/lib/python2.7/dist-packages/gbpservice/neutron/nsf/'\
+              'configurator/drivers/vpn'
+
+SERVICE_TYPE = 'vpn'
 
 STATE_PENDING = 'PENDING_CREATE'
 STATE_INIT = 'INIT'
