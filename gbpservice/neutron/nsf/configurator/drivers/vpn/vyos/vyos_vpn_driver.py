@@ -38,35 +38,34 @@ class VpnGenericConfigDriver(object):
     def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
 
-    def configure_source_routes(self, context, vm_mgmt_ip, service_vendor,
-                                source_cidrs, destination_cidr, gateway_ip,
-                                provider_interface_position):
+    def configure_source_routes(self, context, kwargs):
 
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
 
-        url = const.request_url % (vm_mgmt_ip, const.CONFIGURATION_SERVER_PORT,
+
+        url = const.request_url % (kwargs['vm_mgmt_ip'], const.CONFIGURATION_SERVER_PORT,
                                    'add-source-route')
         active_configured = False
         route_info = []
-        for source_cidr in source_cidrs:
+        for source_cidr in kwargs['source_cidrs']:
             route_info.append({'source_cidr': source_cidr,
-                               'gateway_ip': gateway_ip})
+                               'gateway_ip': kwargs['gateway_ip']})
         data = json.dumps(route_info)
         msg = ("Initiating POST request to configure route of "
-               "primary service at: %r" % vm_mgmt_ip)
+               "primary service at: %r" % kwargs['vm_mgmt_ip'])
         LOG.info(msg)
         try:
             resp = requests.post(url, data=data, timeout=60)
         except requests.exceptions.ConnectionError, err:
             msg = ("Failed to establish connection to service at: "
-                   "%r. ERROR: %r" % (vm_mgmt_ip, str(err).capitalize()))
+                   "%r. ERROR: %r" % (kwargs['vm_mgmt_ip'], str(err).capitalize()))
             LOG.error(msg)
             raise Exception(err)
         except requests.exceptions.RequestException, err:
             msg = ("Unexpected ERROR happened  while configuring "
                    "route of service at: %r ERROR: %r" % (
-                    vm_mgmt_ip, str(err).capitalize()))
+                    kwargs['vm_mgmt_ip'], str(err).capitalize()))
             LOG.error(msg)
             raise Exception(err)
 
@@ -74,7 +73,7 @@ class VpnGenericConfigDriver(object):
             message = json.loads(resp.text)
             if message.get("status", False):
                 msg = ("Route configured successfully for VYOS"
-                       " service at: %r" % vm_mgmt_ip)
+                       " service at: %r" % kwargs['vm_mgmt_ip'])
                 LOG.info(msg)
                 active_configured = True
             else:
@@ -88,32 +87,31 @@ class VpnGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def delete_source_routes(self, context, vm_mgmt_ip, service_vendor,
-                             source_cidrs, provider_interface_position):
+    def delete_source_routes(self, context, kwargs):
 
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
         active_configured = False
-        url = const.request_url % (vm_mgmt_ip, const.CONFIGURATION_SERVER_PORT,
+        url = const.request_url % (kwargs['vm_mgmt_ip'], const.CONFIGURATION_SERVER_PORT,
                                    'delete-source-route')
         route_info = []
-        for source_cidr in source_cidrs:
+        for source_cidr in kwargs['source_cidrs']:
             route_info.append({'source_cidr': source_cidr})
         data = json.dumps(route_info)
         msg = ("Initiating DELETE route request to primary service at: %r"
-               % vm_mgmt_ip)
+               % kwargs['vm_mgmt_ip'])
         LOG.info(msg)
         try:
             resp = requests.delete(url, data=data, timeout=self.timeout)
         except requests.exceptions.ConnectionError, err:
             msg = ("Failed to establish connection to primary service at: "
-                   " %r. ERROR: %r" % (vm_mgmt_ip, err))
+                   " %r. ERROR: %r" % (kwargs['vm_mgmt_ip'], err))
             LOG.error(msg)
             raise Exception(err)
         except requests.exceptions.RequestException, err:
             msg = ("Unexpected ERROR happened  while deleting "
                    " route of service at: %r ERROR: %r"
-                   % (vm_mgmt_ip,  err))
+                   % (kwargs['vm_mgmt_ip'],  err))
             LOG.error(msg)
             raise Exception(err)
 
