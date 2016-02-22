@@ -17,8 +17,7 @@ import re
 import requests
 
 from oslo_concurrency import lockutils
-from osl
-o_config import cfg
+from oslo_config import cfg
 from oslo_log import log as logging
 from gbpservice.neutron.nsf.configurator.drivers.base.\
                             base_driver import BaseDriver
