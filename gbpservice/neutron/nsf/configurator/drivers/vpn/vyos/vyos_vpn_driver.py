@@ -17,7 +17,8 @@ import re
 import requests
 
 from oslo_concurrency import lockutils
-from oslo_config import cfg
+from osl
+o_config import cfg
 from oslo_log import log as logging
 from gbpservice.neutron.nsf.configurator.drivers.base.\
                             base_driver import BaseDriver
@@ -37,14 +38,6 @@ class VpnGenericConfigDriver(object):
 
     def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
-
-    def configure_interfaces(self, context, kwargs):
-        pass
-
-    def clear_interfaces(self, context, vm_mgmt_ip, service_vendor,
-                         provider_interface_position,
-                         stitching_interface_position):
-        pass
 
     def configure_source_routes(self, context, vm_mgmt_ip, service_vendor,
                                 source_cidrs, destination_cidr, gateway_ip,
@@ -132,7 +125,7 @@ class VpnGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def add_persistent_rule(self, context, kwargs):
+    def configure_interfaces(self, context, kwargs):
 
         rule_info = kwargs['rule_info']
 
@@ -185,7 +178,7 @@ class VpnGenericConfigDriver(object):
                                    rule_info['tenant_id']))
         LOG.info(msg)
 
-    def delete_persistent_rule(self, context, kwargs):
+    def clear_interfaces(self, context, kwargs):
 
         rule_info = kwargs['rule_info']
 
