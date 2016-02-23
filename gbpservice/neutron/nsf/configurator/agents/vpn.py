@@ -24,6 +24,7 @@ from neutron import context
 
 from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
 from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
+from gbpservice.neutron.nsf.configurator.agents import agent_base
 from gbpservice.neutron.nsf.core.main import Event
 from gbpservice.neutron.nsf.core.main import RpcAgent
 from gbpservice.neutron.nsf.configurator.lib import utils
@@ -313,7 +314,7 @@ class VpnaasRpcSender(object):
                       % str(err).capitalize())
 
 
-class VPNaasRpcManager(object):
+class VPNaasRpcManager(agent_base.AgentBaseRPCManager):
     """
     APIs for receiving RPC messages from vpn plugin.
     """
