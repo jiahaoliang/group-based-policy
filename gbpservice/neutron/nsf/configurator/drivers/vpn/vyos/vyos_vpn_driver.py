@@ -2,17 +2,230 @@ import copy
 import json
 import requests
 
-from gbpservice.neutron.nsf.configurator.drivers.base.\
-                            base_driver import BaseDriver
+from gbpservice.neutron.nsf.configurator.agents import vpn
+from gbpservice.neutron.nsf.configurator.drivers.base.base_driver import (
+                                                                BaseDriver)
 from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
 from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
-from gbpservice.neutron.nsf.configurator.agents import vpn
 
 from oslo_concurrency import lockutils
 from oslo_config import cfg
 from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
+
+auth_server_opts = [
+    cfg.StrOpt(
+        'auth_uri',
+        default="",
+        help=_("Keystone auth URI")),
+    cfg.StrOpt(
+        'admin_user',
+        default="cloud_admin",
+        help=_("Cloud admin user name")),
+    cfg.StrOpt(
+        'admin_password',
+        default="",
+        help=_("Cloud admin user password")),
+    cfg.StrOpt(
+        'admin_tenant_name',
+        default="admin",
+        help=_("Cloud admin tenant name")),
+    cfg.StrOpt(
+        'remote_vpn_role_name',
+        default="vpn",
+        help=_("Name of kv3 role for remote vpn users")),
+]
+cfg.CONF.register_opts(auth_server_opts, 'keystone_authtoken')
+
+OPTS = [
+    cfg.StrOpt('driver', required=True,
+               help='driver to be used for vyos configuration'),
+]
+
+cfg.CONF.register_opts(OPTS, "VYOS_CONFIG")
+
+vpn_agent_opts = [
+    cfg.MultiStrOpt(
+        'vpn_device_driver',
+        default=[],
+        help=_("The vpn device drivers Neutron will use")),
+]
+cfg.CONF.register_opts(vpn_agent_opts, 'vpnagent')
+rest_timeout = [
+    cfg.IntOpt(
+        'rest_timeout',
+        default=30,
+        help=_("rest api timeout"))]
+
+cfg.CONF.register_opts(rest_timeout)
+
+
+class RestApi(object):
+    def __init__(self, vm_mgmt_ip):
+        self.vm_mgmt_ip = vm_mgmt_ip
+        self.timeout = cfg.CONF.rest_timeout
+
+    def _dict_to_query_str(self, args):
+        return '&'.join([str(k) + '=' + str(v) for k, v in args.iteritems()])
+
+    def post(self, api, args):
+        url = const.request_url % (
+            self.vm_mgmt_ip,
+            const.CONFIGURATION_SERVER_PORT, api)
+        data = json.dumps(args)
+
+        try:
+            resp = requests.post(url, data=data, timeout=self.timeout)
+            message = json.loads(resp.text)
+            msg = ("POST url %s %d" % (url, resp.status_code))
+            LOG.debug(msg)
+            if resp.status_code == 200 and message.get("status", False):
+                msg = ("POST Rest API %s - Success" % (url))
+                LOG.info(msg)
+            else:
+                msg = ("POST Rest API %s - Failed with status %s, %s"
+                       % (url, resp.status_code,
+                          message.get("reason", None)))
+                LOG.error(msg)
+                raise Exception(msg)
+        except Exception as err:
+            msg = ("Post Rest API %s - Failed. Reason: %s"
+                   % (url, str(err).capitalize()))
+            LOG.error(msg)
+            raise Exception(msg)
+
+    def put(self, api, args):
+        url = const.request_url % (
+            self.vm_mgmt_ip,
+            const.CONFIGURATION_SERVER_PORT, api)
+        data = json.dumps(args)
+
+        try:
+            resp = requests.put(url, data=data, timeout=self.timeout)
+            msg = ("PUT url %s %d" % (url, resp.status_code))
+            LOG.debug(msg)
+            if resp.status_code == 200:
+                msg = ("REST API PUT %s succeeded." % url)
+                LOG.debug(msg)
+            else:
+                msg = ("REST API PUT %s failed with status: %d."
+                       % (url, resp.status_code))
+                LOG.error(msg)
+        except Exception as err:
+            msg = ("REST API for PUT %s failed. %s"
+                   % (url, str(err).capitalize()))
+            LOG.error(msg)
+
+    def delete(self, api, args, data=None):
+        url = const.request_url % (
+            self.vm_mgmt_ip,
+            const.CONFIGURATION_SERVER_PORT, api)
+
+        if args:
+            url += '?' + self._dict_to_query_str(args)
+
+        if data:
+            data = json.dumps(data)
+        try:
+            resp = requests.delete(url, timeout=self.timeout, data=data)
+            message = json.loads(resp.text)
+            msg = ("DELETE url %s %d" % (url, resp.status_code))
+            LOG.debug(msg)
+            if resp.status_code == 200 and message.get("status", False):
+                msg = ("DELETE Rest API %s - Success" % (url))
+                LOG.info(msg)
+            else:
+                msg = ("DELETE Rest API %s - Failed %s"
+                       % (url, message.get("reason", None)))
+                LOG.error(msg)
+                raise Exception(msg)
+        except Exception as err:
+            msg = ("Delete Rest API %s - Failed. Reason: %s"
+                   % (url, str(err).capitalize()))
+            LOG.error(msg)
+            raise Exception(msg)
+
+    def get(self, api, args):
+        output = ''
+
+        url = const.request_url % (
+            self.vm_mgmt_ip,
+            const.CONFIGURATION_SERVER_PORT, api)
+
+        try:
+            resp = requests.get(url, params=args, timeout=self.timeout)
+            msg = ("GET url %s %d" % (url, resp.status_code))
+            LOG.debug(msg)
+            if resp.status_code == 200:
+                msg = ("REST API GET %s succeeded." % url)
+                LOG.debug(msg)
+                json_resp = resp.json()
+                return json_resp
+            else:
+                msg = ("REST API GET %s failed with status: %d."
+                       % (url, resp.status_code))
+                LOG.error(msg)
+        except requests.exceptions.Timeout as err:
+            msg = ("REST API GET %s timed out. %s."
+                   % (url, str(err).capitalize()))
+            LOG.error(msg)
+        except Exception as err:
+            msg = ("REST API for GET %s failed. %s"
+                   % (url, str(err).capitalize()))
+            LOG.error(msg)
+
+        return output
+
+
+class VPNSvcValidator(object):
+    def __init__(self, agent):
+        self.agent = agent
+
+    def _error_state(self, context, vpnsvc, message=''):
+        self.agent.update_service_status(
+            context,
+            vpnsvc,
+            const.STATE_ERROR)
+        raise exc.ResourceErrorState(name='vpn_service', id=vpnsvc['id'],
+                                     message=message)
+
+    def _active_state(self, context, vpnsvc):
+        self.agent.update_service_status(
+            context,
+            vpnsvc,
+            const.STATE_ACTIVE)
+
+    def _get_local_cidr(self, vpn_svc):
+        svc_desc = vpn_svc['description']
+        tokens = svc_desc.split(';')
+        local_cidr = tokens[1].split('=')[1]
+        return local_cidr
+
+    def validate(self, context, vpnsvc):
+        lcidr = self._get_local_cidr(vpnsvc)
+        """
+        Get the vpn services for this tenant
+        Check for overlapping lcidr - not allowed
+        """
+        filters = {'tenant_id': [context.tenant_id]}
+        t_vpnsvcs = self.agent.get_vpn_services(
+            context, filters=filters)
+        vpnsvc.pop("status", None)
+        for svc in t_vpnsvcs:
+            del svc['status']
+        if vpnsvc in t_vpnsvcs:
+            t_vpnsvcs.remove(vpnsvc)
+        for svc in t_vpnsvcs:
+            t_lcidr = self._get_local_cidr(svc)
+            if t_lcidr == lcidr:
+                msg = ("Local cidr %s conflicts with existing vpnservice %s"
+                       % (lcidr, svc['id']))
+                LOG.error(msg)
+                self._error_state(
+                    context,
+                    vpnsvc, msg)
+        self._active_state(context, vpnsvc)
 
 
 class VpnGenericConfigDriver(object):
@@ -24,10 +237,7 @@ class VpnGenericConfigDriver(object):
     def __init__(self):
         self.timeout = cfg.CONF.rest_timeout
 
-    def configure_source_routes(self, context, kwargs):
-
-        # REVISIT(VK): This was all along bad way, don't know why at all it
-        # was done like this.
+    def configure_routes(self, context, kwargs):
 
         url = const.request_url % (kwargs['vm_mgmt_ip'],
                                    const.CONFIGURATION_SERVER_PORT,
@@ -74,10 +284,8 @@ class VpnGenericConfigDriver(object):
                % (active_configured))
         LOG.info(msg)
 
-    def delete_source_routes(self, context, kwargs):
+    def delete_routes(self, context, kwargs):
 
-        # REVISIT(VK): This was all along bad way, don't know why at all it
-        # was done like this.
         active_configured = False
         url = const.request_url % (kwargs['vm_mgmt_ip'],
                                    const.CONFIGURATION_SERVER_PORT,
@@ -325,7 +533,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         LOG.emit("info", "IPSec: Pushing ipsec configuration %s" % conn)
         conn['tunnel_local_cidr'] = tunnel_local_cidr
         self._ipsec_conn_correct_enc_algo(svc_context['siteconns'][0])
-        vpn.RestApi(mgmt_fip).post("create-ipsec-site-conn", svc_context)
+        RestApi(mgmt_fip).post("create-ipsec-site-conn", svc_context)
         self._init_state(context, conn)
 
     def _ipsec_create_tunnel(self, context, mgmt_fip, conn):
@@ -340,7 +548,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         tunnel['local_cidr'] = tunnel_local_cidr
         tunnel['peer_cidrs'] = conn['peer_cidrs']
 
-        vpn.RestApi(mgmt_fip).post("create-ipsec-site-tunnel", tunnel)
+        RestApi(mgmt_fip).post("create-ipsec-site-tunnel", tunnel)
         self._init_state(context, conn)
 
     def _ipsec_get_tenant_conns(self, context, mgmt_fip, conn,
@@ -427,7 +635,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         tunnel['local_cidr'] = lcidr
         tunnel['peer_cidrs'] = conn['peer_cidrs']
         try:
-            vpn.RestApi(mgmt_fip).delete(
+            RestApi(mgmt_fip).delete(
                 "delete-ipsec-site-tunnel", tunnel)
         except Exception as err:
             msg = ("IPSec: Failed to delete IPSEC tunnel. %s"
@@ -437,7 +645,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
     def _ipsec_delete_connection(self, context, mgmt_fip,
                                  conn):
         try:
-            vpn.RestApi(mgmt_fip).delete(
+            RestApi(mgmt_fip).delete(
                 "delete-ipsec-site-conn",
                 {'peer_address': conn['peer_address']})
         except Exception as err:
@@ -454,7 +662,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
                 'peer_address': conn['peer_address'],
                 'local_cidr': lcidr,
                 'peer_cidr': conn['peer_cidrs'][0]}
-            output = vpn.RestApi(fip).get(
+            output = RestApi(fip).get(
                 "get-ipsec-site-tunnel-state",
                 tunnel)
             state = output['state']
@@ -481,7 +689,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         kwargs = ev.data.get('kwargs')
         svc = kwargs.get('resource')
         LOG.debug("Validating VPN service " + svc)
-        validator = vpn.VPNSvcValidator(self)
+        validator = VPNSvcValidator(self)
         validator.validate(context, svc)
 
     def create_ipsec_conn(self, ev):
