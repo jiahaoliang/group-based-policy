@@ -1,30 +1,16 @@
-# One Convergence, Inc. CONFIDENTIAL
-# Copyright (c) 2012-2016, One Convergence, Inc., USA
-# All Rights Reserved.
-#
-# All information contained herein is, and remains the property of
-# One Convergence, Inc. and its suppliers, if any. The intellectual and
-# technical concepts contained herein are proprietary to One Convergence,
-# Inc. and its suppliers.
-#
-# Dissemination of this information or reproduction of this material is
-# strictly forbidden unless prior written permission is obtained from
-# One Convergence, Inc., USA
-
 import copy
 import json
-import re
 import requests
 
-from oslo_concurrency import lockutils
-from oslo_config import cfg
-from oslo_log import log as logging
 from gbpservice.neutron.nsf.configurator.drivers.base.\
                             base_driver import BaseDriver
 from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
 from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
-from gbpservice.neutron.nsf.configurator.agents.vpn import RestApi
-from gbpservice.neutron.nsf.configurator.agents.vpn import VPNSvcValidator
+from gbpservice.neutron.nsf.configurator.agents import vpn
+
+from oslo_concurrency import lockutils
+from oslo_config import cfg
+from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
@@ -43,8 +29,8 @@ class VpnGenericConfigDriver(object):
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
 
-
-        url = const.request_url % (kwargs['vm_mgmt_ip'], const.CONFIGURATION_SERVER_PORT,
+        url = const.request_url % (kwargs['vm_mgmt_ip'],
+                                   const.CONFIGURATION_SERVER_PORT,
                                    'add-source-route')
         active_configured = False
         route_info = []
@@ -59,7 +45,8 @@ class VpnGenericConfigDriver(object):
             resp = requests.post(url, data=data, timeout=60)
         except requests.exceptions.ConnectionError, err:
             msg = ("Failed to establish connection to service at: "
-                   "%r. ERROR: %r" % (kwargs['vm_mgmt_ip'], str(err).capitalize()))
+                   "%r. ERROR: %r" % (kwargs['vm_mgmt_ip'],
+                                      str(err).capitalize()))
             LOG.error(msg)
             raise Exception(err)
         except requests.exceptions.RequestException, err:
@@ -92,7 +79,8 @@ class VpnGenericConfigDriver(object):
         # REVISIT(VK): This was all along bad way, don't know why at all it
         # was done like this.
         active_configured = False
-        url = const.request_url % (kwargs['vm_mgmt_ip'], const.CONFIGURATION_SERVER_PORT,
+        url = const.request_url % (kwargs['vm_mgmt_ip'],
+                                   const.CONFIGURATION_SERVER_PORT,
                                    'delete-source-route')
         route_info = []
         for source_cidr in kwargs['source_cidrs']:
@@ -233,7 +221,8 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
     Driver class for implementing VPN IPSEC configuration
     requests from VPNaas Plugin.
     """
-    service_type='vpn'
+    service_type = const.SERVICE_TYPE
+
     def __init__(self, vpn_agent):
         self.agent = vpn_agent
         self.handlers = {
@@ -246,12 +235,12 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
 
     @property
     def service_type(self):
-        return "%s-%s" % (const.VYOS, const.SERVICE_TYPE_IPSEC)
+        return "%s-%s" % (const.VYOS, const.SERVICE_TYPE)
 
     def _error_state(self, context, conn, message=''):
         self.agent.update_conn_status(
             context,
-            const.SERVICE_TYPE_IPSEC,
+            const.SERVICE_TYPE,
             conn,
             const.STATE_ERROR)
         raise exc.ResourceErrorState(
@@ -262,7 +251,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         LOG.emit("info", "IPSec: Configured successfully- %s " % conn['id'])
         self.agent.update_conn_status(
             context,
-            const.SERVICE_TYPE_IPSEC,
+            const.SERVICE_TYPE,
             conn,
             const.STATE_INIT)
 
@@ -336,7 +325,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         LOG.emit("info", "IPSec: Pushing ipsec configuration %s" % conn)
         conn['tunnel_local_cidr'] = tunnel_local_cidr
         self._ipsec_conn_correct_enc_algo(svc_context['siteconns'][0])
-        RestApi(mgmt_fip).post("create-ipsec-site-conn", svc_context)
+        vpn.RestApi(mgmt_fip).post("create-ipsec-site-conn", svc_context)
         self._init_state(context, conn)
 
     def _ipsec_create_tunnel(self, context, mgmt_fip, conn):
@@ -351,7 +340,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         tunnel['local_cidr'] = tunnel_local_cidr
         tunnel['peer_cidrs'] = conn['peer_cidrs']
 
-        RestApi(mgmt_fip).post("create-ipsec-site-tunnel", tunnel)
+        vpn.RestApi(mgmt_fip).post("create-ipsec-site-tunnel", tunnel)
         self._init_state(context, conn)
 
     def _ipsec_get_tenant_conns(self, context, mgmt_fip, conn,
@@ -438,7 +427,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         tunnel['local_cidr'] = lcidr
         tunnel['peer_cidrs'] = conn['peer_cidrs']
         try:
-            RestApi(mgmt_fip).delete(
+            vpn.RestApi(mgmt_fip).delete(
                 "delete-ipsec-site-tunnel", tunnel)
         except Exception as err:
             msg = ("IPSec: Failed to delete IPSEC tunnel. %s"
@@ -448,7 +437,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
     def _ipsec_delete_connection(self, context, mgmt_fip,
                                  conn):
         try:
-            RestApi(mgmt_fip).delete(
+            vpn.RestApi(mgmt_fip).delete(
                 "delete-ipsec-site-conn",
                 {'peer_address': conn['peer_address']})
         except Exception as err:
@@ -465,7 +454,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
                 'peer_address': conn['peer_address'],
                 'local_cidr': lcidr,
                 'peer_cidr': conn['peer_cidrs'][0]}
-            output = RestApi(fip).get(
+            output = vpn.RestApi(fip).get(
                 "get-ipsec-site-tunnel-state",
                 tunnel)
             state = output['state']
@@ -492,7 +481,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
         kwargs = ev.data.get('kwargs')
         svc = kwargs.get('resource')
         LOG.debug("Validating VPN service " + svc)
-        validator = VPNSvcValidator(self)
+        validator = vpn.VPNSvcValidator(self)
         validator.validate(context, svc)
 
     def create_ipsec_conn(self, ev):
@@ -612,7 +601,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
             if changed:
                 self.agent.update_conn_status(
                     context,
-                    const.SERVICE_TYPE_IPSEC,
+                    const.SERVICE_TYPE,
                     conn,
                     state)
 
