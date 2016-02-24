@@ -1,15 +1,15 @@
 import json
 import os
+import oslo_messaging as messaging
 import requests
 
-from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
-from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
 from gbpservice.neutron.nsf.configurator.agents import agent_base
-from gbpservice.neutron.nsf.core import main
+from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
 from gbpservice.neutron.nsf.configurator.lib import utils
+from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
+from gbpservice.neutron.nsf.core import main
 
 from oslo_log import log as logging
-import oslo_messaging as messaging
 from oslo_messaging import MessagingTimeout
 
 from neutron import context

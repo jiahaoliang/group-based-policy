@@ -3,8 +3,7 @@ import json
 import requests
 
 from gbpservice.neutron.nsf.configurator.agents import vpn
-from gbpservice.neutron.nsf.configurator.drivers.base.base_driver import (
-                                                                BaseDriver)
+from gbpservice.neutron.nsf.configurator.drivers.base import base_driver
 from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
 from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
 
@@ -424,7 +423,7 @@ class VpnGenericConfigDriver(object):
                                     rule_info['tenant_id']))
 
 
-class VpnaasIpsecDriver(VpnGenericConfigDriver, BaseDriver):
+class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
     """
     Driver class for implementing VPN IPSEC configuration
     requests from VPNaas Plugin.
