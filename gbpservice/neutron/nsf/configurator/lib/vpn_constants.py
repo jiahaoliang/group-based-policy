@@ -1,4 +1,4 @@
-DRIVERS_DIR = '/usr/lib/python2.7/dist-packages/gbpservice/neutron/nsf/'\
+DRIVERS_DIR = '/usr/lib/python2.7/dist-packages/gbpservice/nfp/'\
               'configurator/drivers/vpn'
 
 SERVICE_TYPE = 'vpn'

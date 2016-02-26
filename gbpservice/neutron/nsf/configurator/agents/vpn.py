@@ -3,11 +3,11 @@ import os
 import oslo_messaging as messaging
 import requests
 
-from gbpservice.neutron.nsf.configurator.agents import agent_base
-from gbpservice.neutron.nsf.configurator.lib import exceptions as exc
-from gbpservice.neutron.nsf.configurator.lib import utils
-from gbpservice.neutron.nsf.configurator.lib import vpn_constants as const
-from gbpservice.neutron.nsf.core import main
+from gbpservice.nfp.configurator.agents import agent_base
+from gbpservice.nfp.configurator.lib import exceptions as exc
+from gbpservice.nfp.configurator.lib import utils
+from gbpservice.nfp.configurator.lib import vpn_constants as const
+from gbpservice.nfp.core import main
 
 from oslo_log import log as logging
 from oslo_messaging import MessagingTimeout
@@ -103,8 +103,8 @@ class VPNaasRpcManager(agent_base.AgentBaseRPCManager):
         arg_dict = {'context': context,
                     'kwargs': kwargs}
 
-        ev = self._sc.event(id='UPDATE_VPN_SERVICE', data=arg_dict)
-        self._sc.rpc_event(ev)
+        ev = self._sc.new_event(id='UPDATE_VPN_SERVICE', data=arg_dict)
+        self._sc.post_event(ev)
 
 
 class VPNaasEventHandler(object):
