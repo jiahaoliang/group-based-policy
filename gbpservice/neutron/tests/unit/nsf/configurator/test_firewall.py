@@ -1,4 +1,3 @@
-import eventlet
 import requests
 import unittest
 import mock
@@ -10,27 +9,27 @@ import oslo_messaging
 
 from neutron.common import rpc as n_rpc
 
-from gbpservice.neutron.nsf.configurator.agents import firewall as fw
-from gbpservice.neutron.nsf.configurator.agents import generic_config as gc
-from gbpservice.neutron.nsf.configurator.drivers.firewall.\
+from gbpservice.nfp.configurator.agents import firewall as fw
+from gbpservice.nfp.configurator.agents import generic_config as gc
+from gbpservice.nfp.configurator.drivers.firewall.\
                             vyos.vyos_fw_driver import FwaasDriver
-from gbpservice.neutron.nsf.configurator.drivers.firewall.\
+from gbpservice.nfp.configurator.drivers.firewall.\
                             vyos.vyos_fw_driver import FwGenericConfigDriver
 
 
-eventlet.monkey_patch()
 
 LOG = logging.getLogger(__name__)
 
 FIREWALL_RPC_TOPIC = "firewall_topic"
 FIREWALL_GENERIC_CONFIG_RPC_TOPIC = "vyos_firewall_topic"
-HOST = 'devstack'
+HOST = 'configurator-dpak'
 STATUS_ACTIVE = "ACTIVE"
 
 
 class FakeObjects(object):
     sc = 'sc'
-    context = {}
+    context = {'notification_data': {},
+               'resource': 'interfaces'}
     firewall = 'firewall'
     host = 'host'
     conf = 'conf'
@@ -66,6 +65,7 @@ class FakeObjects(object):
                   'destination_cidr': ['1.2.3.4/24'],
                   'gateway_ip': '1.2.3.4',
                   'provider_interface_position': '1',
+                  'request_info': 'some_id',
                   'rule_info': {
                         'active_provider_mac': '00:0a:95:9d:68:16',
                         'provider_mac': '00:0a:95:9d:68:16',
@@ -74,7 +74,8 @@ class FakeObjects(object):
                         'active_fip': '172.24.4.5',
                         'fip': '172.24.4.5',
                         'service_id': '1df1cd7a-d82e-4bbd-8b26-a1f106075a6b',
-                        'tenant_id': '6bb921bb81254b3e90e3d8c71a6d72dc'}
+                        'tenant_id': '6bb921bb81254b3e90e3d8c71a6d72dc'},
+                  'context': {'notification_data': 'hello'}
                   }
         return kwargs
 
@@ -99,6 +100,24 @@ class FakeObjects(object):
                     }
         return firewall
 
+    def fake_request_data_generic_config(self):
+        data = {
+                'context': {},
+                'kwargs': self._fake_kwargs(),
+                'request_info': 'xxx'}
+
+        request_data = {
+                 'info':   {
+                             'version': 'v1'},
+
+                 'config': [
+                        {'resource': 'interfaces',
+                         'kwargs': data}
+                    ]
+                }
+
+        return request_data
+
 
 class FWaasRpcManagerTestCase(unittest.TestCase):
     ''' Fwaas RPC receiver for Firewall module '''
@@ -118,9 +137,9 @@ class FWaasRpcManagerTestCase(unittest.TestCase):
         arg_dict = {'context': self.fo.context,
                     'firewall': self.fo.firewall,
                     'host': self.fo.host}
-        with mock.patch.object(sc, 'event', return_value='foo') as (
+        with mock.patch.object(sc, 'new_event', return_value='foo') as (
                                                         mock_sc_event), \
-            mock.patch.object(sc, 'rpc_event') as mock_sc_rpc_event:
+            mock.patch.object(sc, 'post_event') as mock_sc_rpc_event:
             call_method = getattr(agent, method.lower())
             call_method(self.fo.context, self.fo.firewall, self.fo.host)
 
@@ -159,17 +178,17 @@ class GenericConfigRpcManagerTestCase(unittest.TestCase):
         arg_dict = {'context': self.fo.context,
                     'kwargs': self.fo.kwargs}
         with mock.patch.object(
-                    sc, 'event', return_value='foo') as mock_sc_event, \
-            mock.patch.object(sc, 'rpc_event') as mock_sc_rpc_event:
+                    sc, 'new_event', return_value='foo') as mock_sc_event, \
+            mock.patch.object(sc, 'post_event') as mock_sc_rpc_event:
             call_method = getattr(agent, method.lower())
 
             if method == 'CONFIGURE_INTERFACES':
                 call_method(self.fo.context, self.fo.kwargs)
             elif method == 'CLEAR_INTERFACES':
                 call_method(self.fo.context, self.fo.kwargs)
-            elif method == 'CONFIGURE_SOURCE_ROUTES':
+            elif method == 'CONFIGURE_ROUTES':
                 call_method(self.fo.context, self.fo.kwargs)
-            elif method == 'DELETE_SOURCE_ROUTES':
+            elif method == 'CLEAR_ROUTES':
                 call_method(self.fo.context, self.fo.kwargs)
 
             mock_sc_event.assert_called_with(id=method, data=arg_dict)
@@ -189,7 +208,7 @@ class GenericConfigRpcManagerTestCase(unittest.TestCase):
 
     def test_delete_source_routes_genericconfigrpcmanager(self):
         ''' delete_source_routes method in RPC Receiver '''
-        self._test_event_creation('DELETE_ROUTES')
+        self._test_event_creation('CLEAR_ROUTES')
 
 
 class FakeEvent(object):
@@ -237,28 +256,28 @@ class GenericConfigEventHandlerTestCase(unittest.TestCase):
              mock.patch.object(
                 driver, 'clear_interfaces') as mock_clear_inte, \
              mock.patch.object(
-                driver, 'configure_source_routes') as mock_config_src_routes, \
+                driver, 'configure_routes') as mock_config_src_routes, \
              mock.patch.object(
-                driver, 'delete_source_routes') as mock_delete_src_routes, \
+                driver, 'clear_routes') as mock_delete_src_routes, \
              mock.patch.object(
                 agent, '_get_driver', return_value=driver):
+            self.ev.data.update({'context': self.fo.context})
             agent.handle_event(self.ev)
 
             kwargs = self.fo._fake_kwargs()
+            kwargs.pop('request_info')
             if self.ev.id == 'CONFIGURE_INTERFACES':
                 mock_config_inte.assert_called_with(
                                         self.fo.context, kwargs)
             elif self.ev.id == 'CLEAR_INTERFACES':
                 mock_clear_inte.assert_called_with(
                                         self.fo.context, kwargs)
-            elif self.ev.id == 'CONFIGURE_SOURCE_ROUTES':
+            elif self.ev.id == 'CONFIGURE_ROUTES':
                 mock_config_src_routes.assert_called_with(
                             self.fo.context, kwargs)
-            elif self.ev.id == 'DELETE_SOURCE_ROUTES':
+            elif self.ev.id == 'CLEAR_ROUTES':
                 mock_delete_src_routes.delete_source_routes(
                             self.fo.context, kwargs)
-            elif self.ev.id == 'something stupid':
-                self.assertRaises(KeyError)
 
     def test_configure_interfaces_genericconfigeventhandler(self):
         ''' Handle event for configure_interfaces '''
@@ -272,20 +291,16 @@ class GenericConfigEventHandlerTestCase(unittest.TestCase):
 
     def test_configure_source_routes_genericconfigeventhandler(self):
         ''' Handle event for configure_source_routes '''
-        self.ev.id = 'CONFIGURE_SOURCE_ROUTES'
+        self.ev.id = 'CONFIGURE_ROUTES'
         self._test_handle_event()
 
     def test_delete_source_routes_genericconfigeventhandler(self):
         ''' Handle event for delete_source_routes '''
-        self.ev.id = 'DELETE_SOURCE_ROUTES'
-        self._test_handle_event()
-
-    def test_spurious_event_genericconfigeventhandler(self):
-        ''' Handle event for spurious event '''
-        self.ev.id = 'something stupid'
+        self.ev.id = 'CLEAR_ROUTES'
         self._test_handle_event()
 
 
+"""
 class FwaasHandlerTestCase(unittest.TestCase):
     ''' Generic Config Handler for Firewall module '''
 
@@ -519,6 +534,7 @@ class FwaasDriverTestCase(unittest.TestCase):
         with self.assertRaises(KeyError):
             self.driver.delete_firewall(self.fo.context,
                                         self.fo.firewall, self.fo.host)
+"""
 
 if __name__ == '__main__':
     unittest.main()

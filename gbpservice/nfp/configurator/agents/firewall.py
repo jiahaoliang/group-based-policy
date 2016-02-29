@@ -18,10 +18,10 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 from requests import ConnectionError
 
-from gbpservice.neutron.nsf.configurator.agents import agent_base
-from gbpservice.neutron.nsf.configurator.lib import fw_constants as const
-from gbpservice.neutron.nsf.configurator.lib import utils as load_driver
-from gbpservice.neutron.nsf.core import main
+from gbpservice.nfp.configurator.agents import agent_base
+from gbpservice.nfp.configurator.lib import fw_constants as const
+from gbpservice.nfp.configurator.lib import utils as load_driver
+from gbpservice.nfp.core import main
 
 
 LOG = logging.getLogger(__name__)
@@ -115,24 +115,24 @@ class FWaasRpcManager(agent_base.AgentBaseRPCManager):
         arg_dict = {'context': context,
                     'firewall': firewall,
                     'host': host}
-        ev = self._sc.event(id='CREATE_FIREWALL', data=arg_dict)
-        self._sc.rpc_event(ev)
+        ev = self._sc.new_event(id='CREATE_FIREWALL', data=arg_dict)
+        self._sc.post_event(ev)
 
     def update_firewall(self, context, firewall, host):
         LOG.debug("FwaasRpcReceiver received Update Firewall request.")
         arg_dict = {'context': context,
                     'firewall': firewall,
                     'host': host}
-        ev = self._sc.event(id='UPDATE_FIREWALL', data=arg_dict)
-        self._sc.rpc_event(ev)
+        ev = self._sc.new_event(id='UPDATE_FIREWALL', data=arg_dict)
+        self._sc.post_event(ev)
 
     def delete_firewall(self, context, firewall, host):
         LOG.debug("FwaasRpcReceiver received Delete Firewall request.")
         arg_dict = {'context': context,
                     'firewall': firewall,
                     'host': host}
-        ev = self._sc.event(id='DELETE_FIREWALL', data=arg_dict)
-        self._sc.rpc_event(ev)
+        ev = self._sc.new_event(id='DELETE_FIREWALL', data=arg_dict)
+        self._sc.post_event(ev)
 
 
 class FWaasEventHandler(object):
@@ -205,6 +205,7 @@ class FWaasEventHandler(object):
 
         elif ev.id == 'DELETE_FIREWALL':
             if not self._is_firewall_rule_exists(firewall):
+                LOG.info("No firewall rule to delete")
                 return self.plugin_rpc.firewall_deleted(context,
                                                         firewall['id'])
             try:

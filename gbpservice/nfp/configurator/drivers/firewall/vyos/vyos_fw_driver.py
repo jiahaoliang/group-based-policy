@@ -20,9 +20,9 @@ from oslo_log import log as logging
 
 from neutron import context
 
-from gbpservice.neutron.nsf.configurator.drivers.base.\
+from gbpservice.nfp.configurator.drivers.base.\
                             base_driver import BaseDriver
-from gbpservice.neutron.nsf.configurator.lib import fw_constants as const
+from gbpservice.nfp.configurator.lib import fw_constants as const
 
 LOG = logging.getLogger(__name__)
 
@@ -142,8 +142,8 @@ class FwGenericConfigDriver(object):
         LOG.info(msg)
         return const.STATUS_SUCCESS
 
-    def configure_source_routes(self, context, kwargs):
-        vm_mgmt_ip = kwargs.get('mgmt_ip')
+    def configure_routes(self, context, kwargs):
+        vm_mgmt_ip = kwargs.get('vm_mgmt_ip')
         source_cidrs = kwargs.get('source_cidrs')
         gateway_ip = kwargs.get('gateway_ip')
 
@@ -198,8 +198,8 @@ class FwGenericConfigDriver(object):
             return ("Failed to configure source route. Response code: %s."
                     "Response Content: %r" % (resp.status_code, resp.content))
 
-    def delete_source_routes(self, context, kwargs):
-        vm_mgmt_ip = kwargs.get('mgmt_ip')
+    def clear_routes(self, context, kwargs):
+        vm_mgmt_ip = kwargs.get('vm_mgmt_ip')
         source_cidrs = kwargs.get('source_cidrs')
 
         # REVISIT(VK): This was all along bad way, don't know why at all it
