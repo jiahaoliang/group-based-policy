@@ -28,6 +28,7 @@ STATUS_ACTIVE = "ACTIVE"
 
 class FakeObjects(object):
     sc = 'sc'
+    empty_dict = {}
     context = {'notification_data': {},
                'resource': 'interfaces'}
     firewall = 'firewall'
@@ -213,20 +214,21 @@ class GenericConfigRpcManagerTestCase(unittest.TestCase):
 
 class FakeEvent(object):
     def __init__(self):
-        self.fo = FakeObjects()
-        kwargs = self.fo._fake_kwargs()
+        fo = FakeObjects()
+        kwargs = fo._fake_kwargs()
         self.data = {
-                    'context': self.fo.context,
-                    'firewall': self.fo._fake_firewall_obj(),
-                    'host': self.fo.host,
+                    'context': {'notification_data': {},
+                                'resource': 'interfaces'},
+                    'firewall': fo._fake_firewall_obj(),
+                    'host': fo.host,
                     'kwargs': kwargs,
-                    'vm_mgmt_ip': self.fo.vm_mgmt_ip,
-                    'service_vendor': self.fo.service_vendor,
-                    'source_cidrs': self.fo.source_cidrs,
-                    'destination_cidr': self.fo.destination_cidr,
-                    'gateway_ip': self.fo.gateway_ip,
+                    'vm_mgmt_ip': fo.vm_mgmt_ip,
+                    'service_vendor': fo.service_vendor,
+                    'source_cidrs': fo.source_cidrs,
+                    'destination_cidr': fo.destination_cidr,
+                    'gateway_ip': fo.gateway_ip,
                     'provider_interface_position': (
-                                        self.fo.provider_interface_position)}
+                                        fo.provider_interface_position)}
         self.id = 'dummy'
 
 
@@ -237,7 +239,8 @@ class GenericConfigEventHandlerTestCase(unittest.TestCase):
         super(GenericConfigEventHandlerTestCase, self).__init__(
                                                         *args, **kwargs)
         self.fo = FakeObjects()
-        self.ev = FakeEvent()
+        self.context = {'notification_data': {},
+                        'resource': 'interfaces'}
 
     @mock.patch(__name__ + '.FakeObjects.nqueue')
     @mock.patch(__name__ + '.FakeObjects.rpcmgr')
@@ -248,7 +251,7 @@ class GenericConfigEventHandlerTestCase(unittest.TestCase):
         agent = gc.GenericConfigEventHandler(sc, drivers, rpcmgr, nqueue)
         return agent
 
-    def _test_handle_event(self):
+    def _test_handle_event(self, ev):
         agent = self._get_GenericConfigEventHandler_object()
         driver = FwGenericConfigDriver()
         with mock.patch.object(
@@ -261,43 +264,46 @@ class GenericConfigEventHandlerTestCase(unittest.TestCase):
                 driver, 'clear_routes') as mock_delete_src_routes, \
              mock.patch.object(
                 agent, '_get_driver', return_value=driver):
-            self.ev.data.update({'context': self.fo.context})
-            agent.handle_event(self.ev)
+            agent.handle_event(ev)
 
             kwargs = self.fo._fake_kwargs()
             kwargs.pop('request_info')
-            if self.ev.id == 'CONFIGURE_INTERFACES':
+            if ev.id == 'CONFIGURE_INTERFACES':
                 mock_config_inte.assert_called_with(
-                                        self.fo.context, kwargs)
-            elif self.ev.id == 'CLEAR_INTERFACES':
+                                        self.context, kwargs)
+            elif ev.id == 'CLEAR_INTERFACES':
                 mock_clear_inte.assert_called_with(
-                                        self.fo.context, kwargs)
-            elif self.ev.id == 'CONFIGURE_ROUTES':
+                                        self.context, kwargs)
+            elif ev.id == 'CONFIGURE_ROUTES':
                 mock_config_src_routes.assert_called_with(
-                            self.fo.context, kwargs)
-            elif self.ev.id == 'CLEAR_ROUTES':
+                            self.context, kwargs)
+            elif ev.id == 'CLEAR_ROUTES':
                 mock_delete_src_routes.delete_source_routes(
-                            self.fo.context, kwargs)
+                            self.context, kwargs)
 
     def test_configure_interfaces_genericconfigeventhandler(self):
         ''' Handle event for configure_interfaces '''
-        self.ev.id = 'CONFIGURE_INTERFACES'
-        self._test_handle_event()
+        ev = FakeEvent()
+        ev.id = 'CONFIGURE_INTERFACES'
+        self._test_handle_event(ev)
 
     def test_clear_interfaces_genericconfigeventhandler(self):
         ''' Handle event for clear_interfaces '''
-        self.ev.id = 'CLEAR_INTERFACES'
-        self._test_handle_event()
+        ev = FakeEvent()
+        ev.id = 'CLEAR_INTERFACES'
+        self._test_handle_event(ev)
 
     def test_configure_source_routes_genericconfigeventhandler(self):
         ''' Handle event for configure_source_routes '''
-        self.ev.id = 'CONFIGURE_ROUTES'
-        self._test_handle_event()
+        ev = FakeEvent()
+        ev.id = 'CONFIGURE_ROUTES'
+        self._test_handle_event(ev)
 
     def test_delete_source_routes_genericconfigeventhandler(self):
         ''' Handle event for delete_source_routes '''
-        self.ev.id = 'CLEAR_ROUTES'
-        self._test_handle_event()
+        ev = FakeEvent()
+        ev.id = 'CLEAR_ROUTES'
+        self._test_handle_event(ev)
 
 
 """
