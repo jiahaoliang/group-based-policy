@@ -4,7 +4,7 @@ import oslo_messaging as messaging
 import requests
 
 from gbpservice.nfp.configurator.agents import agent_base
-from gbpservice.nfp.configurator.lib import exceptions as exc
+# from gbpservice.nfp.configurator.lib import exceptions as exc
 from gbpservice.nfp.configurator.lib import utils
 from gbpservice.nfp.configurator.lib import vpn_constants as const
 from gbpservice.nfp.core import main

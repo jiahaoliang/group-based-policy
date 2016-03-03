@@ -4,7 +4,7 @@ import requests
 
 from gbpservice.nfp.configurator.agents import vpn
 from gbpservice.nfp.configurator.drivers.base import base_driver
-from gbpservice.nfp.configurator.lib import exceptions as exc
+# from gbpservice.nfp.configurator.lib import exceptions as exc
 from gbpservice.nfp.configurator.lib import vpn_constants as const
 
 from oslo_concurrency import lockutils
