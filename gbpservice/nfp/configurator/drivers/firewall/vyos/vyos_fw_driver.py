@@ -105,7 +105,7 @@ class FwGenericConfigDriver(object):
             if result_static_ips != const.STATUS_SUCCESS:
                 return result_static_ips
             else:
-                LOG.info("Added static IPs. Error: %s" % result_static_ips)
+                LOG.info("Added static IPs. Result: %s" % result_static_ips)
 
         rule_info = kwargs.get('rule_info')
 
