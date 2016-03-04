@@ -57,5 +57,5 @@ gbp network-service-policy-create --network-service-params type=ip_pool,name=vip
 gbp group-create --provided-policy-rule-sets service_management_ruleset=None --l2-policy service_management_l2p --network-service-policy svc_mgmt_fip_policy svc_management_ptg
 
 
-#gbp service-profile-create --shared True --servicetype FIREWALL --insertion-mode l3 --service-flavor vyos --vendor NFP vyos_fw
+gbp service-profile-create --shared True --servicetype FIREWALL --insertion-mode l3 --service-flavor vyos --vendor NFP vyos_fw
 
