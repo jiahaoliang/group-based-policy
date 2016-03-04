@@ -4,7 +4,6 @@ import requests
 
 from gbpservice.nfp.configurator.agents import vpn
 from gbpservice.nfp.configurator.drivers.base import base_driver
-# from gbpservice.nfp.configurator.lib import exceptions as exc
 from gbpservice.nfp.configurator.lib import vpn_constants as const
 
 from oslo_concurrency import lockutils
@@ -181,19 +180,33 @@ class VPNSvcValidator(object):
     def __init__(self, agent):
         self.agent = agent
 
+    def _update_service_status(self, vpnsvc, status):
+        """
+        Driver will call this API to report
+        status of VPN service.
+        """
+        msg = ("Driver informing status: %s."
+               % status)
+        LOG.debug(msg)
+        vpnsvc_status = [{
+            'id': vpnsvc['id'],
+            'status': status,
+            'updated_pending_status':True}]
+        return vpnsvc_status
+
     def _error_state(self, context, vpnsvc, message=''):
-        self.agent.update_service_status(
-            context,
-            vpnsvc,
-            const.STATE_ERROR)
+        
+        self.agent.update_status(
+            context, self._update_service_status(vpnsvc, const.STATE_ERROR))
+
+        '''
         raise exc.ResourceErrorState(name='vpn_service', id=vpnsvc['id'],
                                      message=message)
+        '''
 
     def _active_state(self, context, vpnsvc):
-        self.agent.update_service_status(
-            context,
-            vpnsvc,
-            const.STATE_ACTIVE)
+        self.agent.update_status(
+            context, self._update_service_status(vpnsvc, const.STATE_ERROR))
 
     def _get_local_cidr(self, vpn_svc):
         svc_desc = vpn_svc['description']
@@ -207,7 +220,7 @@ class VPNSvcValidator(object):
         Get the vpn services for this tenant
         Check for overlapping lcidr - not allowed
         """
-        filters = {'tenant_id': [context.tenant_id]}
+        filters = {'tenant_id': [context['tenant_id']]}
         t_vpnsvcs = self.agent.get_vpn_services(
             context, filters=filters)
         vpnsvc.pop("status", None)
@@ -251,7 +264,7 @@ class VpnGenericConfigDriver(object):
                "primary service at: %r" % kwargs['vm_mgmt_ip'])
         LOG.info(msg)
         try:
-            resp = requests.post(url, data=data, timeout=60)
+            resp = requests.post(url, data=data, timeout=self.timeout)
         except requests.exceptions.ConnectionError, err:
             msg = ("Failed to establish connection to service at: "
                    "%r. ERROR: %r" % (kwargs['vm_mgmt_ip'],
@@ -282,8 +295,9 @@ class VpnGenericConfigDriver(object):
         msg = ("Route configuration status : %r "
                % (active_configured))
         LOG.info(msg)
+        LOG.error(msg)
 
-    def delete_routes(self, context, kwargs):
+    def clear_routes(self, context, kwargs):
 
         active_configured = False
         url = const.request_url % (kwargs['vm_mgmt_ip'],
@@ -316,6 +330,7 @@ class VpnGenericConfigDriver(object):
         msg = ("Route deletion status : %r "
                % (active_configured))
         LOG.info(msg)
+        LOG.error(msg)
 
     def configure_interfaces(self, context, kwargs):
 
@@ -369,6 +384,7 @@ class VpnGenericConfigDriver(object):
                " of tenant: %r" % (rule_info['service_id'],
                                    rule_info['tenant_id']))
         LOG.info(msg)
+        LOG.error(msg)
 
     def clear_interfaces(self, context, kwargs):
 
@@ -422,6 +438,9 @@ class VpnGenericConfigDriver(object):
                " of tenant: %r " % (rule_info['service_id'],
                                     rule_info['tenant_id']))
 
+        LOG.info(msg)
+        LOG.error(msg)
+
 
 class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
     """
@@ -430,8 +449,8 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
     """
     service_type = const.SERVICE_TYPE
 
-    def __init__(self, vpn_agent):
-        self.agent = vpn_agent
+    def __init__(self, agent_context):
+        self.agent = agent_context
         self.handlers = {
             'vpn_service': {
                 'create': self.create_vpn_service},
@@ -439,28 +458,47 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
                 'create': self.create_ipsec_conn,
                 'update': self.update_ipsec_conn,
                 'delete': self.delete_ipsec_conn}}
-
+        super(VpnaasIpsecDriver, self).__init__()
+    '''
     @property
     def service_type(self):
         return "%s-%s" % (const.VYOS, const.SERVICE_TYPE)
+    '''
+
+    def _update_conn_status(self, conn, status):
+        """
+        Driver will call this API to report
+        status of a connection - only if there is any change.
+        """
+        msg = ("Driver informing connection status "
+               "changed to %s" % status)
+        LOG.debug(msg)
+        vpnsvc_status = [{
+            'id': conn['vpnservice_id'],
+            'status':'ACTIVE',
+            'updated_pending_status':False,
+            'ipsec_site_connections':{
+                conn['id']: {
+                    'status': status,
+                    'updated_pending_status': True}}}]
+        return vpnsvc_status
 
     def _error_state(self, context, conn, message=''):
-        self.agent.update_conn_status(
-            context,
-            const.SERVICE_TYPE,
-            conn,
-            const.STATE_ERROR)
+        self.agent.update_status(
+            context, self._update_conn_status(conn,
+                                              const.STATE_ERROR))
+
+        '''
         raise exc.ResourceErrorState(
             name='ipsec-site-conn',
             id=conn['id'], message=message)
+        '''
 
     def _init_state(self, context, conn):
-        LOG.emit("info", "IPSec: Configured successfully- %s " % conn['id'])
-        self.agent.update_conn_status(
-            context,
-            const.SERVICE_TYPE,
-            conn,
-            const.STATE_INIT)
+        LOG.info("IPSec: Configured successfully- %s " % conn['id'])
+        self.agent.update_status(
+            context, self._update_conn_status(conn,
+                                              const.STATE_INIT))
 
     def _get_fip_from_vpnsvc(self, vpn_svc):
         svc_desc = vpn_svc['description']
@@ -513,31 +551,48 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         conn['ikepolicy']['encryption_algorithm'] = ike_enc_algo
         conn['ipsecpolicy']['encryption_algorithm'] = ipsec_enc_algo
 
+    def _get_filers(self, tenant_id=None,
+                    vpnservice_id=None,
+                    conn_id=None, peer_address=None):
+        filters = {}
+        if tenant_id:
+            filters['tenant_id'] = tenant_id
+        if vpnservice_id:
+            filters['vpnservice_id'] = vpnservice_id
+        if conn_id:
+            filters['siteconn_id'] = conn_id
+        if peer_address:
+            filters['peer_address'] = peer_address
+        return filters
+
     def _ipsec_create_conn(self, context, mgmt_fip, conn):
         """
         Get the context for this conn
         Issue POST to the vyos agenet
         """
-        svc_context = self.agent.get_ipsec_contexts(
-            context, conn_id=conn['id'])[0]
+        # define one more function to get the filters out of the context object
+        # and directly pass to the below get_ipsec_contexts function
 
+        # the optional param in the below calling function can be
+        # removed it seems
+        svc_context = self.agent.get_vpn_servicecontext(
+            context, self._get_filers(conn_id=conn['id']))[0]
         tunnel_local_cidr = self.\
             _get_ipsec_tunnel_local_cidr(svc_context)
-
         conn = svc_context['siteconns'][0]['connection']
         svc_context['siteconns'][0]['connection']['stitching_fixed_ip'] = (
             self._get_stitching_fixed_ip(conn))
         svc_context['siteconns'][0]['connection']['access_ip'] = (
             self._get_user_access_ip(conn))
-        LOG.emit("info", "IPSec: Pushing ipsec configuration %s" % conn)
+        LOG.info("IPSec: Pushing ipsec configuration %s" % conn)
         conn['tunnel_local_cidr'] = tunnel_local_cidr
         self._ipsec_conn_correct_enc_algo(svc_context['siteconns'][0])
         RestApi(mgmt_fip).post("create-ipsec-site-conn", svc_context)
         self._init_state(context, conn)
 
     def _ipsec_create_tunnel(self, context, mgmt_fip, conn):
-        svc_context = self.agent.get_ipsec_contexts(
-            context, conn_id=conn['id'])[0]
+        svc_context = self.agent.get_vpn_servicecontext(
+            context, self._get_filers(conn_id=conn['id']))[0]
 
         tunnel_local_cidr = self.\
             _get_ipsec_tunnel_local_cidr(svc_context)
@@ -553,10 +608,8 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
     def _ipsec_get_tenant_conns(self, context, mgmt_fip, conn,
                                 on_delete=False):
         filters = {
-            'tenant_id': [context.tenant_id],
-            # 'vpnservice_id': [conn['vpnservice_id']],
+            'tenant_id': [context['tenant_id']],
             'peer_address': [conn['peer_address']]}
-
         tenant_conns = self.agent.get_ipsec_conns(
             context, filters)
         if not tenant_conns:
@@ -564,11 +617,12 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
                 # Something went wrong - atleast the current
                 # connection should be there
                 msg = _("No tenant conns for filters (%s)" % (str(filters)))
-                LOG.emit("error", msg)
+                LOG.error(msg)
                 # Move conn into err state
                 self._error_state(context, conn, msg)
 
         conn_to_remove = None
+         
         for connection in tenant_conns:
             if connection['id'] == conn['id']:
                 conn_to_remove = connection
@@ -577,9 +631,8 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             tenant_conns.remove(conn_to_remove)
         if not tenant_conns:
             return tenant_conns
-
+        
         conn_list = []
-        # get fip from connn description
         svc_ids = [conn['vpnservice_id'] for conn in tenant_conns]
         vpnservices = self.agent.get_vpn_services(context, ids=svc_ids)
         copy_svc = copy.deepcopy(vpnservices)
@@ -606,7 +659,6 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
                 if tconn['status'] == (
                                 const.STATE_PENDING and tconn in conn_list):
                     conn_list.remove(tconn)
-
         return conn_list
 
     def _ipsec_check_overlapping_peer(self, context,
@@ -620,7 +672,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             for pcidr in pcidrs:
                 if pcidr in t_pcidrs:
                     msg = _("Overlapping peer cidr (%s)" % (pcidr))
-                    LOG.emit("error", msg)
+                    LOG.error(msg)
                     self._error_state(
                         context, conn, msg)
 
@@ -639,7 +691,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         except Exception as err:
             msg = ("IPSec: Failed to delete IPSEC tunnel. %s"
                    % str(err).capitalize())
-            LOG.emit("error", msg)
+            LOG.error(msg)
 
     def _ipsec_delete_connection(self, context, mgmt_fip,
                                  conn):
@@ -650,7 +702,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         except Exception as err:
             msg = ("IPSec: Failed to delete IPSEC conn. %s"
                    % str(err).capitalize())
-            LOG.emit("error", msg)
+            LOG.error(msg)
 
     def _ipsec_is_state_changed(self, svc_context, conn, fip):
         c_state = None
@@ -683,22 +735,17 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         vm_mgmt_ip = tokens[0].split('=')[1]
         return vm_mgmt_ip
 
-    def create_vpn_service(self, ev):
-        context = ev.data.get('context')
-        kwargs = ev.data.get('kwargs')
+    def create_vpn_service(self, context, kwargs):
+        
         svc = kwargs.get('resource')
-        LOG.debug("Validating VPN service " + svc)
-        validator = VPNSvcValidator(self)
+        LOG.debug("Validating VPN service %s " % svc)
+        validator = VPNSvcValidator(self.agent)
         validator.validate(context, svc)
 
-    def create_ipsec_conn(self, ev):
-        context = ev.data.get('context')
-        kwargs = ev.data.get('kwargs')
+    def create_ipsec_conn(self, context, kwargs):
         conn = kwargs.get('resource')
         mgmt_fip = self._get_vm_mgmt_ip_from_desc(conn)
-
-        LOG.emit("info", "IPsec: create siteconnection %s" % conn)
-        # vpnservice_id = conn['vpnservice_id']
+        LOG.info("IPsec: create siteconnection %s" % conn)
         """
         Following conditions -
         0) Conn with more than one peer_address
@@ -716,21 +763,25 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         if t_lcidr in conn['peer_cidrs']:
             message = _("IPSec: Tunnel remote cidr %s conflicts "
                         "with local cidr." % t_lcidr)
-            LOG.emit("error", message)
+            LOG.error( message)
             self._error_state(context, conn, message)
         if len(conn['peer_cidrs']) != 1:
             msg = ("IPSec: Invalid number of peer CIDR. Should not be"
                    " less than 1.")
-            LOG.emit("error", msg)
+            LOG.error(msg)
             self._error_state(context, conn, msg)
 
+
+        
         try:
+            
             tenant_conns = self._ipsec_get_tenant_conns(
                 context, mgmt_fip, conn)
         except Exception as err:
             msg = ("IPSec: Failed to get tenant conns for IPSEC create. %s"
                    % str(err).capitalize())
-            LOG.emit("error", msg)
+            LOG.error(msg)
+        
         try:
             if not tenant_conns:
                 self._ipsec_create_conn(context, mgmt_fip, conn)
@@ -743,14 +794,16 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
                 self._ipsec_check_overlapping_peer(
                     context, tenant_conns, conn)
                 self._ipsec_create_tunnel(context, mgmt_fip, conn)
-        except exc.ResourceErrorState as rex:
-            raise rex
+            '''
+            except exc.ResourceErrorState as rex:
+                raise rex
+            '''
         except Exception as ex:
             msg = "IPSec: Exception in creating ipsec conn: %s" % ex
-            LOG.emit("error", msg)
+            LOG.error(msg)
             self._error_state(context, conn, msg)
 
-    def update_ipsec_conn(self,  context, mgmt_fip, **kwargs):
+    def update_ipsec_conn(self,  context, kwargs):
         pass
         # svc_contexts = self.agent.get_ipsec_contexts(
         #    context, conn_id=kwargs.get('id'))
@@ -768,10 +821,12 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         # changed based on what vyos vm will support
         # Maintain this resource ? will be useful in case of update ?
 
-    def delete_ipsec_conn(self, context, mgmt_fip, **kwargs):
+    def delete_ipsec_conn(self, context, kwargs):
+        # removed the mgmt_fip param from this function header
         conn = kwargs.get('resource')
         msg = ("IPsec: delete siteconnection %s" % conn)
-        LOG.emit("info", msg)
+        LOG.info(msg)
+        mgmt_fip = self._get_vm_mgmt_ip_from_desc(conn)
         # vpn_svc = self.agent.get_vpn_services(
         #    context, ids=[conn['vpnservice_id']])[0]
 
@@ -785,11 +840,9 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             else:
                 self._ipsec_delete_connection(
                     context, mgmt_fip, conn)
-        except exc.ResourceErrorState as rex:
-            raise rex
         except Exception as ex:
             msg = "IPSec: delete ipsec conn failed %s " % ex
-            LOG.emit("error", msg)
+            LOG.error(msg)
             self._error_state(context, conn, msg)
 
     def check_status(self,  context, svc_context):
@@ -803,18 +856,16 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             except Exception as err:
                 msg = ("Failed to check if IPSEC state is changed. %s"
                        % str(err).capitalize())
-                LOG.emit("error", msg)
+                LOG.error(msg)
                 continue
             if changed:
-                self.agent.update_conn_status(
-                    context,
-                    const.SERVICE_TYPE,
-                    conn,
-                    state)
+                self.agent.update_status(
+                    context, self._update_conn_status(conn,
+                                                      state))
 
-    def vpnservice_updated(self, context,  **kwargs):
+    def vpnservice_updated(self, context, kwargs):
         """Handle VPNaaS service driver change notifications."""
-        LOG.info(_("SSL: Handling VPN service update notification '%s'"),
+        LOG.info(_("Handling VPN service update notification '%s'"),
                  kwargs.get('reason', ''))
 
         resource = kwargs.get('resource')
@@ -823,16 +874,11 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         # Resources under tenant have inter dependencies.
 
         @lockutils.synchronized(tenant_id)
-        def _vpnservice_updated(context, **kwargs):
+        def _vpnservice_updated(context, kwargs):
+            
             reason = kwargs.get('reason')
             rsrc = kwargs.get('rsrc_type')
+            
+            self.handlers[rsrc][reason](context, kwargs)
 
-            if rsrc not in self.handlers.keys():
-                raise exc.UnknownResourceException(resource=rsrc)
-            if reason not in self.handlers[rsrc].keys():
-                raise exc.UnknownReasonException(reason=reason)
-
-            self.handlers[rsrc][reason](context, **kwargs)
-
-        return _vpnservice_updated(context, **kwargs)
-
+        return _vpnservice_updated(context, kwargs)
