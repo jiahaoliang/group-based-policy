@@ -163,10 +163,10 @@ class FwGenericConfigDriver(object):
         rule_info = kwargs.get('rule_info')
 
         active_rule_info = dict(
-            provider_mac=rule_info['provider_mac'],
-            stitching_mac=rule_info['stitching_mac'])
+            provider_mac=rule_info['active_provider_mac'],
+            stitching_mac=rule_info['active_stitching_mac'])
 
-        active_fip = rule_info['fip']
+        active_fip = rule_info['active_fip']
 
         msg = ("Initiating DELETE persistent rule for SERVICE ID: %r of "
                "tenant: %r " %
