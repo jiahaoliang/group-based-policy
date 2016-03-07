@@ -3,10 +3,12 @@ from wsme import types as wtypes
 
 import controller
 
+"""this class call methods of Controller class
+according to HTTP request"""
+
 
 class ControllerResolver(object):
-    """this class send parameter to controller class
-    according to query string"""
+
     create_network_function_device_config = controller.Controller(
         "create_network_function_device_config")
     delete_network_function_device_config = controller.Controller(
@@ -22,9 +24,14 @@ class ControllerResolver(object):
     get_notifications = controller.Controller("get_notifications")
 
 
+""" All HTTP requests with path starting from /v1
+land here.
+This class forward request with path starting from /v1/nfp
+to ControllerResolver."""
+
+
 class V1Controller(object):
 
-    """ all request with nsf in query land here"""
     nfp = ControllerResolver()
 
     @wsme_pecan.wsexpose(wtypes.text)
