@@ -1,0 +1,122 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Creates new vpn service - ike + ipsec + vpn service + site-site connection",
+    "Parameters": {
+        "peer_address": {
+            "Default": "192.168.102.104",
+            "Description": "Address of peer in site-site connection",
+            "Type": "String"
+        },
+        "peer_id": {
+            "Default": "91.0.0.2",
+            "Description": "Id of the peer",
+            "Type": "String"
+        },
+        "VPNPeerCidr": {
+            "Default": "91.0.0.0/24",
+            "Description": "Remote CIDRs behind peer site",
+            "Type": "String"
+        },
+        "Subnet": {
+            "Default": "e195576d-e8b6-4d13-8e0d-21bceef59ec0",
+            "Description": "Subnet id on which vpn service is launched",
+            "Type": "String"
+        },
+        "RouterId": {
+            "Default": "7f83029d-d879-4508-b1e1-ade81714c58c",
+            "Description": "Router id",
+            "Type": "String"
+        },
+        "ServiceDescription": {
+            "Default": "fip=192.168.20.192;tunnel_local_cidr=10.0.0.0/26",
+            "Description": "Give floating ip here after fip=",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "VPNService": {
+            "Type": "OS::Neutron::VPNService",
+            "Properties": {
+                "name": "VPNService",
+                "description": {
+                    "Ref": "ServiceDescription"
+                },
+                "admin_state_up": true,
+                "router_id": {
+                    "Ref": "RouterId"
+		},
+                "subnet_id": {
+                    "Ref": "Subnet"
+                }
+            }
+        },
+        "IKEPolicy": {
+            "Type": "OS::Neutron::IKEPolicy",
+            "Properties": {
+                "name": "IKEPolicy",
+                "description": "My new IKE policy",
+                "auth_algorithm": "sha1",
+                "encryption_algorithm": "3des",
+                "phase1_negotiation_mode": "main",
+                "lifetime": {
+                    "units": "seconds",
+                    "value": 3600
+                },
+                "pfs": "group5",
+                "ike_version": "v1"
+            }
+        },
+        "IPsecPolicy": {
+            "Type": "OS::Neutron::IPsecPolicy",
+            "Properties": {
+                "name": "IPsecPolicy",
+                "description": "My new IPsec policy",
+                "transform_protocol": "esp",
+                "encapsulation_mode": "tunnel",
+                "auth_algorithm": "sha1",
+                "encryption_algorithm": "3des",
+                "lifetime": {
+                    "units": "seconds",
+                    "value": 3600
+                },
+                "pfs": "group5"
+            }
+        },
+        "IPsecSiteConnection": {
+            "Type": "OS::Neutron::IPsecSiteConnection",
+            "Properties": {
+                "name": "IPsecSiteConnection",
+                "description": "My new VPN connection",
+                "peer_address": {
+                    "Ref": "peer_address"
+                },
+                "peer_id": {
+                    "Ref": "peer_id"
+                },
+                "peer_cidrs": [
+                    {
+                        "Ref": "VPNPeerCidr"
+                    }
+                ],
+                "mtu": 1500,
+                "dpd": {
+                    "actions": "hold",
+                    "interval": 30,
+                    "timeout": 120
+                },
+                "psk": "secret",
+                "initiator": "bi-directional",
+                "admin_state_up": true,
+                "ikepolicy_id": {
+                    "Ref": "IKEPolicy"
+                },
+                "ipsecpolicy_id": {
+                    "Ref": "IPsecPolicy"
+                },
+                "vpnservice_id": {
+                    "Ref": "VPNService"
+                }
+            }
+        }
+    }
+}
