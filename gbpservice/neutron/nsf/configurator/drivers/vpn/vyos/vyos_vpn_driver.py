@@ -76,10 +76,10 @@ class RestApi(object):
         try:
             resp = requests.post(url, data=data, timeout=self.timeout)
             message = json.loads(resp.text)
-            msg = ("POST url %s %d" % (url, resp.status_code))
-            LOG.debug(msg)
+            msg = "POST url %s %d" % (url, resp.status_code)
+            LOG.info(msg)
             if resp.status_code == 200 and message.get("status", False):
-                msg = ("POST Rest API %s - Success" % (url))
+                msg = "POST Rest API %s - Success" % (url)
                 LOG.info(msg)
             else:
                 msg = ("POST Rest API %s - Failed with status %s, %s"
@@ -101,10 +101,10 @@ class RestApi(object):
 
         try:
             resp = requests.put(url, data=data, timeout=self.timeout)
-            msg = ("PUT url %s %d" % (url, resp.status_code))
+            msg = "PUT url %s %d" % (url, resp.status_code)
             LOG.debug(msg)
             if resp.status_code == 200:
-                msg = ("REST API PUT %s succeeded." % url)
+                msg = "REST API PUT %s succeeded." % url
                 LOG.debug(msg)
             else:
                 msg = ("REST API PUT %s failed with status: %d."
@@ -128,10 +128,10 @@ class RestApi(object):
         try:
             resp = requests.delete(url, timeout=self.timeout, data=data)
             message = json.loads(resp.text)
-            msg = ("DELETE url %s %d" % (url, resp.status_code))
+            msg = "DELETE url %s %d" % (url, resp.status_code)
             LOG.debug(msg)
             if resp.status_code == 200 and message.get("status", False):
-                msg = ("DELETE Rest API %s - Success" % (url))
+                msg = "DELETE Rest API %s - Success" % (url)
                 LOG.info(msg)
             else:
                 msg = ("DELETE Rest API %s - Failed %s"
@@ -153,10 +153,10 @@ class RestApi(object):
 
         try:
             resp = requests.get(url, params=args, timeout=self.timeout)
-            msg = ("GET url %s %d" % (url, resp.status_code))
+            msg = "GET url %s %d" % (url, resp.status_code)
             LOG.debug(msg)
             if resp.status_code == 200:
-                msg = ("REST API GET %s succeeded." % url)
+                msg = "REST API GET %s succeeded." % url
                 LOG.debug(msg)
                 json_resp = resp.json()
                 return json_resp
@@ -195,7 +195,7 @@ class VPNSvcValidator(object):
         return vpnsvc_status
 
     def _error_state(self, context, vpnsvc, message=''):
-        
+
         self.agent.update_status(
             context, self._update_service_status(vpnsvc, const.STATE_ERROR))
 
@@ -224,6 +224,7 @@ class VPNSvcValidator(object):
         t_vpnsvcs = self.agent.get_vpn_services(
             context, filters=filters)
         vpnsvc.pop("status", None)
+
         for svc in t_vpnsvcs:
             del svc['status']
         if vpnsvc in t_vpnsvcs:
@@ -570,11 +571,6 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         Get the context for this conn
         Issue POST to the vyos agenet
         """
-        # define one more function to get the filters out of the context object
-        # and directly pass to the below get_ipsec_contexts function
-
-        # the optional param in the below calling function can be
-        # removed it seems
         svc_context = self.agent.get_vpn_servicecontext(
             context, self._get_filers(conn_id=conn['id']))[0]
         tunnel_local_cidr = self.\
@@ -616,7 +612,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             if not on_delete:
                 # Something went wrong - atleast the current
                 # connection should be there
-                msg = _("No tenant conns for filters (%s)" % (str(filters)))
+                msg = "No tenant conns for filters (%s)" % (str(filters))
                 LOG.error(msg)
                 # Move conn into err state
                 self._error_state(context, conn, msg)
@@ -671,7 +667,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
 
             for pcidr in pcidrs:
                 if pcidr in t_pcidrs:
-                    msg = _("Overlapping peer cidr (%s)" % (pcidr))
+                    msg = "Overlapping peer cidr (%s)" % (pcidr)
                     LOG.error(msg)
                     self._error_state(
                         context, conn, msg)
@@ -738,7 +734,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
     def create_vpn_service(self, context, kwargs):
         
         svc = kwargs.get('resource')
-        LOG.debug("Validating VPN service %s " % svc)
+        LOG.info("Validating VPN service %s " % svc)
         validator = VPNSvcValidator(self.agent)
         validator.validate(context, svc)
 
@@ -761,7 +757,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         """
         t_lcidr = self._get_ipsec_tunnel_local_cidr_from_vpnsvc(conn)
         if t_lcidr in conn['peer_cidrs']:
-            message = _("IPSec: Tunnel remote cidr %s conflicts "
+            message = ("IPSec: Tunnel remote cidr %s conflicts "
                         "with local cidr." % t_lcidr)
             LOG.error( message)
             self._error_state(context, conn, message)
@@ -771,10 +767,8 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
             LOG.error(msg)
             self._error_state(context, conn, msg)
 
-
-        
         try:
-            
+
             tenant_conns = self._ipsec_get_tenant_conns(
                 context, mgmt_fip, conn)
         except Exception as err:
@@ -822,15 +816,12 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
         # Maintain this resource ? will be useful in case of update ?
 
     def delete_ipsec_conn(self, context, kwargs):
-        # removed the mgmt_fip param from this function header
+
         conn = kwargs.get('resource')
-        msg = ("IPsec: delete siteconnection %s" % conn)
+        msg = "IPsec: delete siteconnection %s" % conn
         LOG.info(msg)
         mgmt_fip = self._get_vm_mgmt_ip_from_desc(conn)
-        # vpn_svc = self.agent.get_vpn_services(
-        #    context, ids=[conn['vpnservice_id']])[0]
 
-        # Get list of conns for tenant and peer
         tenant_conns = self._ipsec_get_tenant_conns(
             context, mgmt_fip, conn, on_delete=True)
         try:
@@ -865,7 +856,7 @@ class VpnaasIpsecDriver(VpnGenericConfigDriver, base_driver.BaseDriver):
 
     def vpnservice_updated(self, context, kwargs):
         """Handle VPNaaS service driver change notifications."""
-        LOG.info(_("Handling VPN service update notification '%s'"),
+        LOG.info("Handling VPN service update notification '%s'",
                  kwargs.get('reason', ''))
 
         resource = kwargs.get('resource')

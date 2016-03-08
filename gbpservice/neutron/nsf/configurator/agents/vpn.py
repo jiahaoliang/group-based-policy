@@ -192,9 +192,7 @@ class VPNaasEventHandler(object):
 
     def sync(self, context,  args=None):
         self.needs_sync = True
-        # Whether a separate object hat to be created here ? or
-        # should directly import the class ?
-        # if yes uncomment the below code and comment the next below them
+
         '''
         self.support_rpc = VpnSupportDriver(self.plugin_rpc)
         s2s_contexts = self.support_rpc.get_ipsec_contexts(context)
