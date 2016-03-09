@@ -20,7 +20,7 @@ config-agent to configurator and make RPC call accordingly."""
 
 class Controller(rest.RestController):
 
-    def __init__(self, module_name):
+    def __init__(self, method_name):
         try:
             self.host = subprocess.check_output(
                             'hostname', shell=True).rstrip()
@@ -28,7 +28,7 @@ class Controller(rest.RestController):
             msg = ("Failed to get hostname  %s." % str(err).capitalize())
             LOG.error(msg)
         self.rpcclient = RPCClient(topic=constants.TOPIC, host=self.host)
-        self.module_name = module_name
+        self.method_name = method_name
         super(Controller, self).__init__()
 
     @expose(method='GET', content_type='application/json')
@@ -36,12 +36,14 @@ class Controller(rest.RestController):
         """get method of REST server.
         This method returns Notification data to config-agent"""
         try:
-            notification_data = json.dumps(self.rpcclient.get_notifications())
+            notification_data = json.dumps(self.rpcclient.call())
+            pecan.response.status=200
             msg = ("NOTIFICATION_DATA sent to config_agent %s"
                    % notification_data)
             LOG.info(msg)
             return notification_data
         except Exception as err:
+            pecan.response.status=400
             msg = ("Failed to get notification_data  %s."
                    % str(err).capitalize())
             LOG.error(msg)
@@ -56,15 +58,16 @@ class Controller(rest.RestController):
             body = None
             if request.is_body_readable:
                 body = request.json_body
-
-            method = getattr(self.rpcclient, '%s' % self.module_name)
-            method(body)
-            msg = ("Successfully served HTTP request %s" % self.module_name)
+            
+            self.rpcclient.cast(self.method_name, body)
+            msg = ("Successfully served HTTP request %s" % self.method_name)
+            pecan.response.status=200
             LOG.info(msg)
-            return json.dumps({'SUCCESS': self.module_name})
+            return json.dumps({'SUCCESS': self.method_name})
         except Exception as err:
+            pecan.response.status=400
             msg = ("Failed to serve HTTP post request %s %s."
-                   % (self.module_name, str(err).capitalize()))
+                   % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             return json.dumps({'ERROR': msg})
 
@@ -78,15 +81,16 @@ class Controller(rest.RestController):
             if request.is_body_readable:
                 body = request.json_body
 
-            method = getattr(self.rpcclient, '%s' % self.module_name)
-            method(body)
-            msg = ("Successfully served HTTP request %s" % self.module_name)
+            self.rpcclient.cast(self.method_name, body)
+            pecan.response.status=200
+            msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
-            return json.dumps({'SUCCESS': self.module_name})
+            return json.dumps({'SUCCESS': self.method_name})
 
         except Exception as err:
+            pecan.response.status=400
             msg = ("Failed to serve HTTP put request %s %s."
-                   % (self.module_name, str(err).capitalize()))
+                   % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             return json.dumps({'ERROR': msg})
 
@@ -109,47 +113,19 @@ class RPCClient(object):
         n_rpc.init(cfg.CONF)
         self.client = n_rpc.get_client(target)
 
-    def get_notifications(self):
-        """ make rpc call 'get_notifications' """
+    def call(self):
+        """ make rpc call for 'get_notifications' """
         cctxt = self.client.prepare(server=self.host)
-        return cctxt.call(self, 'get_notifications')
+        return cctxt.call(self,
+                          'get_notifications')
 
-    def create_network_function_device_config(self, request_data):
-        """ make rpc cast 'create_network_function_device_config' """
+    def cast(self, method_name, request_data):
+        """ make rpc cast for called method """
         cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'create_network_function_device_config',
+        return cctxt.cast(self,
+                          method_name,
                           request_data=request_data)
-
-    def create_network_function_config(self, request_data):
-        """ make rpc cast 'create_network_function_config' """
-        cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'create_network_function_config',
-                          request_data=request_data)
-
-    def update_network_function_device_config(self, request_data):
-        """ make rpc cast 'update_network_function_device_config' """
-        cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'update_network_function_device_config',
-                          request_data=request_data)
-
-    def update_network_function_config(self, request_data):
-        """ make rpc cast 'update_network_function_config' """
-        cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'update_network_function_config',
-                          request_data=request_data)
-
-    def delete_network_function_device_config(self, request_data):
-        """ make rpc cast 'delete_network_function_device_config' """
-        cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'delete_network_function_device_config',
-                          request_data=request_data)
-
-    def delete_network_function_config(self, request_data):
-        """ make rpc cast 'delete_network_function_config' """
-        cctxt = self.client.prepare(server=self.host)
-        return cctxt.cast(self, 'delete_network_function_config',
-                          request_data=request_data)
-
+                          
     def to_dict(self):
 
         return {}
