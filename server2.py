@@ -342,7 +342,7 @@ def add_static_ip():
     static_ip_obj = StaticIp()
     data = json.loads(request.data)
     try:
-        prov_ip_obj.configure(data)
+        static_ip_obj.configure(data)
     except Exception as err:
         logger.error("Error adding static IP for hotplugged interfaces. "
                      "Data: %r. Error: %r" % (data, str(err)))
