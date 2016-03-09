@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 COMMAND = "interfaces ethernet %s address %s/%s"
 
-class ProviderIp(configOpts):
+class StaticIp(configOpts):
     def __init__(self):
         pass
 
@@ -52,7 +52,7 @@ class ProviderIp(configOpts):
                 logger.debug("Result of add static ip is %s." % result)
             session.commit()
         except Exception as err:
-            logger.error("Failed to set provider IP.")
+            logger.error("Failed to set static IP.")
             session.discard()
         
 
@@ -66,5 +66,5 @@ data = {u'stitching_mac': u'fa:16:3e:a4:68:88', u'stitching_cidr': u'192.169.0.0
         u'provider_mac': u'fa:16:3e:e0:8b:2e',
         u'provider_ip': u'11.0.1.1', u'provider_cidr': u'24',
         u'stitching_ip': u'192.169.0.3'}
-obj = ProviderIp()
+obj = StaticIp()
 obj.configure(data)

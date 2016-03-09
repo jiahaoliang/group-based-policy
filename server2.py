@@ -26,7 +26,7 @@ sys.path.insert(0, dirname(dirname(abspath(__file__))))
 from vyos_session.utils import init_logger
 from oc_fw_module import OCFWConfigClass
 from edit_persistent_rule import EditPersistentRule
-from provider_ip import ProviderIp
+from static_ip import StaticIp
 from flask import Flask, request
 from os.path import abspath, dirname
 from vpn_api_server import VPNHandler as vpnhandler
@@ -337,14 +337,14 @@ def send_error_respponse(error):
     return response
 
 
-@app.route('/add_prov_ip', methods=['POST'])
-def add_prov_ip():
-    prov_ip_obj = ProviderIp()
+@app.route('/add_static_ip', methods=['POST'])
+def add_static_ip():
+    static_ip_obj = StaticIp()
     data = json.loads(request.data)
     try:
         prov_ip_obj.configure(data)
     except Exception as err:
-        logger.error("Error adding IP for hotplugged provider interface. "
+        logger.error("Error adding static IP for hotplugged interfaces. "
                      "Data: %r. Error: %r" % (data, str(err)))
         return json.dumps(dict(status=False))
     else:
