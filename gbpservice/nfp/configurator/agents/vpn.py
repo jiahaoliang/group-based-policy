@@ -24,12 +24,11 @@ class VpnaasRpcSender(filters_lib.Filter):
     RPC_API_VERSION = '1.0'
     target = messaging.Target(version=RPC_API_VERSION)
 
-    def __init__(self, context, nqueue):
+    def __init__(self, context, sc):
         self.context = context
-        self.qu = nqueue
+        self.sc = sc
+        self.notify = agent_base.AgentBaseNotification(sc)
         super(VpnaasRpcSender, self).__init__(None, None)
-        # super(VpnaasRpcSender, self).__init__.(None, None)
-        # self.host = host why we need host in FIREWALL
 
     def get_vpn_services(self, context, ids=None, filters=None):
         """Get list of vpnservices on this host.
@@ -73,7 +72,7 @@ class VpnaasRpcSender(filters_lib.Filter):
                'data': {'context': context,
                         'status': status}
                }
-        self.qu.put(msg)
+        self.notify._notification(msg)
 
     def ipsec_site_conn_deleted(self, context, resource_id):
         """ Notify VPNaaS plugin about delete of ipsec-site-conn """
@@ -84,7 +83,7 @@ class VpnaasRpcSender(filters_lib.Filter):
                'data': {'context': context,
                         'resource_id': resource_id}
                }
-        self.qu.put(msg)
+        self.notify._notification(msg)
 
 
 class VPNaasRpcManager(agent_base.AgentBaseRPCManager):
@@ -113,8 +112,8 @@ class VPNaasRpcManager(agent_base.AgentBaseRPCManager):
     def vpnservice_updated(self, context, kwargs):
         arg_dict = {'context': context,
                     'kwargs': kwargs}
-        ev = self._sc.new_event(id='VPNSERVICE_UPDATED', data=arg_dict)
-        self._sc.post_event(ev)
+        ev = self.sc.new_event(id='VPNSERVICE_UPDATED', data=arg_dict)
+        self.sc.post_event(ev)
 
 
 class VPNaasEventHandler(object):
@@ -122,18 +121,17 @@ class VPNaasEventHandler(object):
     Handler class for demultiplexing vpn configuration
     requests from VPNaas Plugin and sending to appropriate driver.
     """
-    def __init__(self, sc, drivers, nqueue):
-        self._sc = sc
+    def __init__(self, sc, drivers):
+        self.sc = sc
         self.drivers = drivers
         self.needs_sync = True
         self.context = ctxt.get_admin_context_without_session()
         self.plugin_rpc = VpnaasRpcSender(
             self.context,
-            nqueue)
+            self.sc)
 
     def _get_driver(self):
-        ''' TO DO: Do demultiplexing logic based on vendor
-        '''
+
         driver_id = const.SERVICE_TYPE
         return self.drivers[driver_id]
 
@@ -145,14 +143,12 @@ class VPNaasEventHandler(object):
             LOG.debug(msg)
 
             driver = self._get_driver()
-            # self.method = getattr(driver, "%s" % (ev.id.lower()))
-            # self.method(ev, driver)
             self.vpnservice_updated(ev, driver)
         except Exception as err:
             LOG.error("Failed to perform the operation: %s. %s"
                       % (ev.id, str(err).capitalize()))
         finally:
-            self._sc.event_done(ev)
+            self.sc.event_done(ev)
 
     def vpnservice_updated(self, ev, driver):
         context = ev.data.get('context')
@@ -160,7 +156,8 @@ class VPNaasEventHandler(object):
         LOG.debug(_("Vpn service updated from server side"))
 
         try:
-            # import pdb;pdb.set_trace() 
+            # in future if the vpnservice service function changes
+            # then one should get the below function with getattr function
             driver.vpnservice_updated(context, kwargs)
         except Exception as err:
             LOG.error("Failed to update VPN service. %s"
@@ -192,11 +189,6 @@ class VPNaasEventHandler(object):
 
     def sync(self, context,  args=None):
         self.needs_sync = True
-
-        '''
-        self.support_rpc = VpnSupportDriver(self.plugin_rpc)
-        s2s_contexts = self.support_rpc.get_ipsec_contexts(context)
-        '''
         s2s_contexts = self.plugin_rpc.get_vpn_servicecontext(context)
         for svc_context in s2s_contexts:
             svc_vendor = self._get_service_vendor(svc_context['service'])
@@ -217,20 +209,19 @@ class VPNaasEventHandler(object):
                                                     resource_id=conn['id'])
 
 
-def events_init(sc, drivers, nqueue):
+def events_init(sc, drivers):
     evs = [
         main.Event(id='VPNSERVICE_UPDATED',
-                   handler=VPNaasEventHandler(sc, drivers, nqueue))]
+                   handler=VPNaasEventHandler(sc, drivers))]
     sc.register_events(evs)
 
 
-def load_drivers(nqueue):
+def load_drivers(sc):
 
     ld = utils.ConfiguratorUtils()
     drivers = ld.load_drivers(const.DRIVERS_DIR)
-    # get the plugin object
     context = ctxt.get_admin_context_without_session()
-    plugin_rpc = VpnaasRpcSender(context, nqueue)
+    plugin_rpc = VpnaasRpcSender(context, sc)
 
     for service_type, driver_name in drivers.iteritems():
         driver_obj = driver_name(plugin_rpc)
@@ -245,9 +236,9 @@ def register_service_agent(cm, sc, conf):
     cm.register_service_agent(const.SERVICE_TYPE, rpcmgr)
 
 
-def init_agent(cm, sc, conf, nqueue):
+def init_agent(cm, sc, conf):
     try:
-        drivers = load_drivers(nqueue)
+        drivers = load_drivers(sc)
     except Exception as err:
         LOG.error("VPNaas failed to load drivers. %s"
                   % (str(err).capitalize()))
@@ -256,7 +247,7 @@ def init_agent(cm, sc, conf, nqueue):
         LOG.debug("VPNaas loaded drivers successfully.")
 
     try:
-        events_init(sc, drivers, nqueue)
+        events_init(sc, drivers)
     except Exception as err:
         LOG.error("VPNaas Events initialization unsuccessful. %s"
                   % (str(err).capitalize()))
