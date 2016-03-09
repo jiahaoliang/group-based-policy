@@ -38,8 +38,6 @@ class StaticIp(configOpts):
                 if 'eth' in interface:
                     map.update({interface: mac_addr})
             
-            print map
-            
             for (interface, mac_addr) in map.iteritems():
                 if provider_mac == mac_addr:
                     set_ip = COMMAND % (interface, provider_ip, provider_cidr)
@@ -47,14 +45,51 @@ class StaticIp(configOpts):
                     set_ip = COMMAND % (interface, stitching_ip, stitching_cidr)
                 else:
                     continue
-                print set_ip
                 result = self.set(set_ip.split())
                 logger.debug("Result of add static ip is %s." % result)
             session.commit()
         except Exception as err:
-            logger.error("Failed to set static IP.")
+            logger.error("Failed to set static IP. Error: %s" % err)
             session.discard()
-        
+
+    def clear(self, data):
+        try:
+            session.setup_config_session()
+            map = {}
+            provider_ip = data['provider_ip']
+            provider_mac = data['provider_mac']
+            provider_cidr = data['provider_cidr'].split('/')[1]
+            
+            stitching_ip = data['stitching_ip']
+            stitching_mac = data['stitching_mac']
+            stitching_cidr = data['stitching_cidr'].split('/')[1]
+    
+            interfaces = netifaces.interfaces()
+            self.provider_ptg_interfaces = list()
+            for interface in interfaces:
+                physical_interface = netifaces.ifaddresses(
+                                                interface).get(AF_LINK)
+                if not physical_interface:
+                    continue
+                mac_addr = netifaces.ifaddresses(
+                                        interface)[AF_LINK][0]['addr']
+                if 'eth' in interface:
+                    map.update({interface: mac_addr})
+
+            for (interface, mac_addr) in map.iteritems():
+                if provider_mac == mac_addr:
+                    del_ip = COMMAND % (interface, provider_ip, provider_cidr)
+                elif stitching_mac == mac_addr:
+                    del_ip = COMMAND % (interface, stitching_ip, stitching_cidr)
+                else:
+                    continue
+                result = self.delete(del_ip.split())
+                logger.debug("Result of delete static IP is %s." % result)
+            session.commit()
+        except Exception as err:
+            logger.error("Failed to delete static IP. Error: %s." % err)
+            session.discard()
+
 
 """data = {'provider_ip': '192.168.132.210',
         'provider_mac': '52:54:00:90:3f:36',

@@ -344,7 +344,21 @@ def add_static_ip():
     try:
         static_ip_obj.configure(data)
     except Exception as err:
-        logger.error("Error adding static IP for hotplugged interfaces. "
+        logger.error("Error adding static IPs for hotplugged interfaces. "
+                     "Data: %r. Error: %r" % (data, str(err)))
+        return json.dumps(dict(status=False))
+    else:
+        return json.dumps(dict(status=True))
+
+
+@app.route('/del_static_ip', methods=['DELETE'])
+def del_static_ip():
+    static_ip_obj = StaticIp()
+    data = json.loads(request.data)
+    try:
+        static_ip_obj.clear(data)
+    except Exception as err:
+        logger.error("Error clearing static IPs for hotplugged interfaces. "
                      "Data: %r. Error: %r" % (data, str(err)))
         return json.dumps(dict(status=False))
     else:
