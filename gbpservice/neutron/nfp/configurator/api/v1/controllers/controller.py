@@ -6,8 +6,9 @@ from neutron.agent.common import config
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
-from pecan import expose, request
+from pecan import expose, request, response
 from pecan import rest
+
 
 import constants
 
@@ -37,7 +38,6 @@ class Controller(rest.RestController):
         This method returns Notification data to config-agent"""
         try:
             notification_data = json.dumps(self.rpcclient.call())
-            pecan.response.status=200
             msg = ("NOTIFICATION_DATA sent to config_agent %s"
                    % notification_data)
             LOG.info(msg)
@@ -61,7 +61,6 @@ class Controller(rest.RestController):
             
             self.rpcclient.cast(self.method_name, body)
             msg = ("Successfully served HTTP request %s" % self.method_name)
-            pecan.response.status=200
             LOG.info(msg)
             return json.dumps({'SUCCESS': self.method_name})
         except Exception as err:
@@ -82,7 +81,6 @@ class Controller(rest.RestController):
                 body = request.json_body
 
             self.rpcclient.cast(self.method_name, body)
-            pecan.response.status=200
             msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
             return json.dumps({'SUCCESS': self.method_name})
@@ -127,5 +125,6 @@ class RPCClient(object):
                           request_data=request_data)
                           
     def to_dict(self):
+        return {}                      
 
-        return {}
+   
