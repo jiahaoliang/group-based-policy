@@ -12,6 +12,7 @@ from gbpservice.nfp.core.rpc import RpcAgent
 from gbpservice.nfp.config_agent import topics
 from gbpservice.nfp.config_agent.firewall import *
 from gbpservice.nfp.config_agent.loadbalancer import *
+from gbpservice.nfp.config_agent.loadbalancerv2 import *
 from gbpservice.nfp.config_agent.vpn import *
 from gbpservice.nfp.config_agent.generic import *
 from gbpservice.nfp.config_agent.rpc_cb import *
@@ -41,6 +42,14 @@ def rpc_init(sc, conf):
         manager=lbrpcmgr
     )
 
+    lbv2rpcmgr = Lbv2Agent(conf, sc)
+    lbv2agent = RpcAgent(
+        sc,
+        host=cfg.CONF.host,
+        topic=topics.LBv2_NFP_CONFIGAGENT_TOPIC,
+        manager=lbv2rpcmgr
+    )
+
     vpnrpcmgr = VpnAgent(conf, sc)
     vpnagent = RpcAgent(
         sc,
@@ -57,7 +66,7 @@ def rpc_init(sc, conf):
         manager=gcrpcmgr
     )
 
-    sc.register_rpc_agents([fwagent, lbagent, vpnagent, gcagent])
+    sc.register_rpc_agents([fwagent, lbagent, lbv2agent, vpnagent, gcagent])
 
 
 def events_init(sc):
