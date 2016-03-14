@@ -1,3 +1,15 @@
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import json
 import subprocess
 
@@ -6,17 +18,23 @@ from neutron.agent.common import config
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
-from pecan import expose, request, response
+import pecan
+from pecan import expose, request
 from pecan import rest
 
-
-import constants
-
 LOG = logging.getLogger(__name__)
+TOPIC = 'configurator'
 
-"""Controller class for handling all the HTTP requests.
-This Controller class serves all the HTTP requests sent by
-config-agent to configurator and make RPC call accordingly."""
+"""Implements all the APIs Invoked by HTTP requests.
+
+Implements following HTTP methods.
+    -get
+    -post
+    -put
+According to the HTTP request received from config-agent this class make
+call/cast to configurator and return response to config-agent
+
+"""
 
 
 class Controller(rest.RestController):
@@ -24,18 +42,27 @@ class Controller(rest.RestController):
     def __init__(self, method_name):
         try:
             self.host = subprocess.check_output(
-                            'hostname', shell=True).rstrip()
+                'hostname', shell=True).rstrip()
+            self.rpcclient = RPCClient(topic=TOPIC, host=self.host)
+            self.method_name = method_name
+            super(Controller, self).__init__()
         except Exception as err:
-            msg = ("Failed to get hostname  %s." % str(err).capitalize())
+            msg = (
+                "Failed to initialize Controller class  %s." %
+                str(err).capitalize())
             LOG.error(msg)
-        self.rpcclient = RPCClient(topic=constants.TOPIC, host=self.host)
-        self.method_name = method_name
-        super(Controller, self).__init__()
 
     @expose(method='GET', content_type='application/json')
     def get(self):
-        """get method of REST server.
-        This method returns Notification data to config-agent"""
+        """Method of REST server to handle request get_notifications.
+
+        This method send an RPC call to configurator and returns Notification
+        data to config-agent
+
+        Returns: Dictionary that contains Notification data
+
+        """
+
         try:
             notification_data = json.dumps(self.rpcclient.call())
             msg = ("NOTIFICATION_DATA sent to config_agent %s"
@@ -43,38 +70,56 @@ class Controller(rest.RestController):
             LOG.info(msg)
             return notification_data
         except Exception as err:
-            pecan.response.status=400
+            pecan.response.status = 400
             msg = ("Failed to get notification_data  %s."
                    % str(err).capitalize())
             LOG.error(msg)
-            return json.dumps({'ERROR': msg})
+            desc = {'msg': msg}
+            return json.dumps({'failure_desc': desc})
 
     @expose(method='POST', content_type='application/json')
     def post(self, **body):
-        """post method REST server.
-        cast RPC according to the post request by using
-        object of RPCClient"""
+        """method of REST server to handle all the post requests.
+
+        This method sends an RPC cast to configurator according to the
+        HTTP request.
+
+        :param body: This method excepts dictionary as a parameter in HTTP
+        request and send this dictionary to configurator with RPC cast.
+
+        Returns: None
+
+        """
+
         try:
             body = None
             if request.is_body_readable:
                 body = request.json_body
-            
+
             self.rpcclient.cast(self.method_name, body)
             msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
-            return json.dumps({'SUCCESS': self.method_name})
         except Exception as err:
-            pecan.response.status=400
+            pecan.response.status = 400
             msg = ("Failed to serve HTTP post request %s %s."
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
-            return json.dumps({'ERROR': msg})
+            desc = {'msg': msg}
+            return json.dumps({'failure_desc': desc})
 
     @expose(method='PUT', content_type='application/json')
     def put(self, **body):
-        """put method REST server.
-        cast RPC according to the put request by using
-        object of RPCClient"""
+        """method of REST server to handle all the put requests.
+
+        This method sends an RPC cast to configurator according to the
+        HTTP request.
+
+        :param body: This method excepts dictionary as a parameter in HTTP
+        request and send this dictionary to configurator with RPC cast.
+
+        Returns: None
+
+        """
         try:
             body = None
             if request.is_body_readable:
@@ -83,18 +128,24 @@ class Controller(rest.RestController):
             self.rpcclient.cast(self.method_name, body)
             msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
-            return json.dumps({'SUCCESS': self.method_name})
-
         except Exception as err:
-            pecan.response.status=400
+            pecan.response.status = 400
             msg = ("Failed to serve HTTP put request %s %s."
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
-            return json.dumps({'ERROR': msg})
+            desc = {'msg': msg}
+            return json.dumps({'failure_desc': desc})
 
 
-"""This class make RPC call/cast on behalf of controller class
-    according to the HTTP request coming from config-agent."""
+"""Implements call/cast methods used in REST Controller.
+
+Implements following methods.
+    -call
+    -cast
+This class send an RPC call/cast to configurator according to the data sent
+by Controller class of REST server.
+
+ """
 
 
 class RPCClient(object):
@@ -112,19 +163,33 @@ class RPCClient(object):
         self.client = n_rpc.get_client(target)
 
     def call(self):
-        """ make rpc call for 'get_notifications' """
+        """Method for sending call request on behalf of REST Controller.
+
+        This method sends an RPC call to configurator.
+
+        Returns: Notification data sent by configurator.
+
+        """
         cctxt = self.client.prepare(server=self.host)
         return cctxt.call(self,
                           'get_notifications')
 
     def cast(self, method_name, request_data):
-        """ make rpc cast for called method """
+        """Method for sending cast request on behalf of REST Controller.
+
+        This method sends an RPC cast to configurator according to the
+        method_name passed by COntroller class of REST server.
+
+        :param method_name:method name can be any of the following.
+
+
+        Returns: None.
+
+        """
         cctxt = self.client.prepare(server=self.host)
         return cctxt.cast(self,
                           method_name,
                           request_data=request_data)
-                          
-    def to_dict(self):
-        return {}                      
 
-   
+    def to_dict(self):
+        return {}

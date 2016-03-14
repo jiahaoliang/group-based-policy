@@ -18,10 +18,10 @@ app = {
 logging = {
     'root': {'level': 'INFO', 'handlers': ['console']},
     'loggers': {
-        'pecanlog': {'level': 'DEBUG',
+        'pecanlog': {'level': 'INFO',
                      'handlers': ['console'],
                      'propagate': False},
-        'pecan': {'level': 'DEBUG',
+        'pecan': {'level': 'INFO',
                   'handlers': ['console'],
                   'propagate': False},
         'py.warnings': {'handlers': ['console']},
@@ -29,7 +29,7 @@ logging = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'color'
         }
