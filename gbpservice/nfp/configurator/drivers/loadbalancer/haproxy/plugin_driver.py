@@ -1,3 +1,7 @@
+# Copyright (c) 2013 OpenStack Foundation.
+# Copyright (c) 2015 Rackspace.
+# All Rights Reserved.
+#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -10,20 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from gbpservice.nfp.config_agent.common import *
-from gbpservice.nfp.config_agent import RestClientOverUnix as rc
-from neutron_lbaas.agent import agent_manager
-from neutron_lbaas.agent import agent_api
-from gbpservice.nfp.config_agent import topics
-
-LOG = logging.getLogger(__name__)
+from neutron_lbaas.drivers.common import agent_driver_base
+from neutron_lbaas.drivers.haproxy import namespace_driver
 
 
-class Lbv2Agent(agent_manager.LbaasAgentManager):
-    def __init__(self, conf, sc):
-        super(Lbv2Agent, self).__init__(conf)
-        self.plugin_rpc = agent_api.LbaasAgentApi(
-            topics.LBv2_NFP_CONFIGAGENT_TOPIC,
-            self.context,
-            self.conf.host
-        )
+class HaproxyOnHostPluginDriver(agent_driver_base.AgentDriverBase):
+    device_driver = namespace_driver.DRIVER_NAME
