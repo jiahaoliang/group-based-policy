@@ -10,7 +10,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from pecan import expose
+import pecan
 
 import controller
 
@@ -54,7 +54,7 @@ class V1Controller(object):
 
     nfp = ControllerResolver()
 
-    @expose()
+    @pecan.expose()
     def get(self):
         # TODO(blogan): decide what exactly should be here, if anything
         return {'versions': [{'status': 'CURRENT',

@@ -11,15 +11,15 @@
 #    under the License.
 
 import json
+import oslo_serialization.jsonutils as jsonutils
 import subprocess
 
-from neutron.common import rpc as n_rpc
 from neutron.agent.common import config
+from neutron.common import rpc as n_rpc
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
 import pecan
-from pecan import expose, request
 from pecan import rest
 
 LOG = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class Controller(rest.RestController):
                 str(err).capitalize())
             LOG.error(msg)
 
-    @expose(method='GET', content_type='application/json')
+    @pecan.expose(method='GET', content_type='application/json')
     def get(self):
         """Method of REST server to handle request get_notifications.
 
@@ -75,9 +75,9 @@ class Controller(rest.RestController):
                    % str(err).capitalize())
             LOG.error(msg)
             error_data = self._format_description(msg)
-            return json.dumps(error_data)
+            return jsonutils.dumps(error_data)
 
-    @expose(method='POST', content_type='application/json')
+    @pecan.expose(method='POST', content_type='application/json')
     def post(self, **body):
         """Method of REST server to handle all the post requests.
 
@@ -93,8 +93,8 @@ class Controller(rest.RestController):
 
         try:
             body = None
-            if request.is_body_readable:
-                body = request.json_body
+            if pecan.request.is_body_readable:
+                body = pecan.request.json_body
 
             self.rpcclient.cast(self.method_name, body)
             msg = ("Successfully served HTTP request %s" % self.method_name)
@@ -105,9 +105,9 @@ class Controller(rest.RestController):
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             error_data = self._format_description(msg)
-            return json.dumps(error_data)
+            return jsonutils.dumps(error_data)
 
-    @expose(method='PUT', content_type='application/json')
+    @pecan.expose(method='PUT', content_type='application/json')
     def put(self, **body):
         """Method of REST server to handle all the put requests.
 
@@ -122,8 +122,8 @@ class Controller(rest.RestController):
         """
         try:
             body = None
-            if request.is_body_readable:
-                body = request.json_body
+            if pecan.request.is_body_readable:
+                body = pecan.request.json_body
 
             self.rpcclient.cast(self.method_name, body)
             msg = ("Successfully served HTTP request %s" % self.method_name)
@@ -134,18 +134,17 @@ class Controller(rest.RestController):
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             error_data = self._format_description(msg)
-            return json.dumps(error_data)
-            
+            return jsonutils.dumps(error_data)
+
     def _format_description(self, msg):
         """This methgod formats error description.
-        
+
         :param msg: An error message that is to be formatted
-        
+
         Returns: error_data dictionary
         """
-        
-        error_data = {'failure_desc': 
-                                     {'msg':msg}}
+
+        error_data = {'failure_desc': {'msg': msg}}
         return error_data
 
 
@@ -205,13 +204,13 @@ class RPCClient(object):
 
     def to_dict(self):
         """This function return empty dictionary.
-        
+
         For making RPC call/cast it internally requires context class that
         contains to_dict() function. Here we are sending context inside
-        request data so we are passing class itself as a context that 
+        request data so we are passing class itself as a context that
         contains to_dict() function.
-        
+
         Returns: Dictionary.
-        
+
         """
         return {}

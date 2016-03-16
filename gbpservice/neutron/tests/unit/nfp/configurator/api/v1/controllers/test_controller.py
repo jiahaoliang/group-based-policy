@@ -1,10 +1,23 @@
-import json
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
+#import json
 import mock
 import unittest
 
-from pecan import make_app
+import oslo_serialization.jsonutils as jsonutils
+import pecan
 from pecan import rest
-from webtest import TestApp
+import webtest
 
 from gbpservice.neutron.nfp.configurator.api import root_controller
 from gbpservice.neutron.nfp.configurator.api.v1.controllers import controller
@@ -31,7 +44,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
 
         """
         RootController = root_controller.RootController()
-        self.app = TestApp(make_app(RootController))
+        self.app = webtest.TestApp(pecan.make_app(RootController))
         self.data = {'request_data': {'info': {}, 'config': [
             {'resource': 'Res', 'kwargs': {'context': 'context'}}]}}
 
@@ -44,7 +57,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
 
         with mock.patch.object(
                 controller.RPCClient, 'call') as rpc_mock:
-            rpc_mock.return_value = json.dumps(self.data)
+            rpc_mock.return_value = jsonutils.dumps(self.data)
             response = self.app.get(
                 '/v1/nfp/get_notifications',
             )
@@ -62,7 +75,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.post(
                 '/v1/nfp/create_network_function_device_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'create_network_function_device_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -78,7 +91,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.post(
                 '/v1/nfp/create_network_function_device_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'create_network_function_device_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -94,7 +107,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.post(
                 '/v1/nfp/create_network_function_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'create_network_function_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -110,7 +123,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.post(
                 '/v1/nfp/delete_network_function_device_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'delete_network_function_device_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -126,7 +139,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.post(
                 '/v1/nfp/delete_network_function_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'delete_network_function_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -142,7 +155,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.put(
                 '/v1/nfp/update_network_function_device_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'update_network_function_device_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -158,7 +171,7 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                 controller.RPCClient, 'cast') as rpc_mock:
             response = self.app.put(
                 '/v1/nfp/update_network_function_config',
-                json.dumps(self.data))
+                jsonutils.dumps(self.data))
         rpc_mock.assert_called_with(
             'update_network_function_config', self.data)
         self.assertEqual(response.status_code, 204)
@@ -194,7 +207,8 @@ class ControllerTestCase(unittest.TestCase, rest.RestController):
                     prepare_mock):
             prepare_mock.return_value = rpcclient.client
             rpc_mock.return_value = True
-            value = rpcclient.cast('rpc_method_name', json.dumps(self.data))
+            value = rpcclient.cast('rpc_method_name',
+                                   jsonutils.dumps(self.data))
         self.assertEqual(value, True)
 
     def test_get_notifications_fail(self):
