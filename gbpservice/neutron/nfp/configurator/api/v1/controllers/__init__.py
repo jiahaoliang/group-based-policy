@@ -10,8 +10,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from wsmeext import pecan as wsme_pecan
-from wsme import types as wtypes
+from pecan import expose
 
 import controller
 
@@ -55,7 +54,7 @@ class V1Controller(object):
 
     nfp = ControllerResolver()
 
-    @wsme_pecan.wsexpose(wtypes.text)
+    @expose()
     def get(self):
         # TODO(blogan): decide what exactly should be here, if anything
         return {'versions': [{'status': 'CURRENT',
