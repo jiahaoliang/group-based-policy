@@ -169,7 +169,7 @@ class LBaaSRpcManagerTest(unittest.TestCase):
         agent = lb.LBaaSRpcManager(sc, conf)
         return agent, sc
 
-    def _test_rpc_manager(self, operation):
+    def _test_rpc_manager(self, operation, request_data, args):
         """ Tests all create/update/delete operation of RPC manager of
         loadbalancer agent.
 
@@ -186,34 +186,8 @@ class LBaaSRpcManagerTest(unittest.TestCase):
             mock.patch.object(rpc_mgr,
                               '_get_service_agent_instance',
                               return_value=agent):
-            if operation == 'CREATE_VIP' or operation == 'DELETE_VIP':
-                request_data = self.fo.get_request_data_for_vip()
-                args = self.arg_dict_vip
-            elif operation == 'UPDATE_VIP':
-                request_data = self.fo.get_request_data_for_vip_update()
-                args = self.arg_dict_vip_update
-            elif operation == 'CREATE_POOL':
-                request_data = self.fo.get_request_data_for_create_pool()
-                args = self.arg_dict_pool
-            elif operation == 'DELETE_POOL':
-                request_data = self.fo.get_request_data_for_delete_pool()
-                args = self.arg_dict_pool_delete
-            elif operation == 'UPDATE_POOL':
-                request_data = self.fo.get_request_data_for_update_pool()
-                args = self.arg_dict_pool_update
-            elif operation == 'CREATE_MEMBER' or operation == 'DELETE_MEMBER':
-                request_data = self.fo.get_request_data_for_create_member()
-                args = self.arg_dict_member
-            elif operation == 'UPDATE_MEMBER':
-                request_data = self.fo.get_request_data_for_update_member()
-                args = self.arg_dict_member_update
-            elif operation == 'CREATE_POOL_HEALTH_MONITOR' or (
-                    operation == 'DELETE_POOL_HEALTH_MONITOR'):
-                request_data = self.fo.get_request_data_for_create_pool_hm()
-                args = self.arg_dict_health_monitor
-            elif operation == 'UPDATE_POOL_HEALTH_MONITOR':
-                request_data = self.fo.get_request_data_for_update_pool_hm()
-                args = self.arg_dict_health_monitor_update
+            
+           
             getattr(rpc_mgr, method[operation])(self.fo.context, request_data)
             mock_sc_new_event.assert_called_with(id=operation, data=args)
             mock_sc_post_event.assert_called_with(self.foo)
@@ -225,8 +199,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
         Returns: none
 
         """
-
-        self._test_rpc_manager('CREATE_VIP')
+        self._test_rpc_manager('CREATE_VIP',
+                               self.fo.get_request_data_for_vip(),
+                               self.arg_dict_vip )
 
     def test_delete_vip_rpc_manager(self):
         """Implements test case for delete vip method
@@ -236,7 +211,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('DELETE_VIP')
+        self._test_rpc_manager('DELETE_VIP',
+                               self.fo.get_request_data_for_vip(),
+                               self.arg_dict_vip )
 
     def test_update_vip_rpc_manager(self):
         """Implements test case for update vip method
@@ -246,7 +223,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('UPDATE_VIP')
+        self._test_rpc_manager('UPDATE_VIP',
+                               self.fo.get_request_data_for_vip_update(),
+                               self.arg_dict_vip_update )
 
     def test_create_pool_rpc_manager(self):
         """Implements test case for create pool method
@@ -256,7 +235,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('CREATE_POOL')
+        self._test_rpc_manager('CREATE_POOL',
+                               self.fo.get_request_data_for_create_pool(),
+                               self.arg_dict_pool)
 
     def test_delete_pool_rpc_manager(self):
         """Implements test case for delete pool method
@@ -266,7 +247,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('DELETE_POOL')
+        self._test_rpc_manager('DELETE_POOL',
+                               self.fo.get_request_data_for_delete_pool(),
+                               self.arg_dict_pool_delete )
 
     def test_update_pool_rpc_manager(self):
         """Implements test case for update pool method
@@ -276,7 +259,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('UPDATE_POOL')
+        self._test_rpc_manager('UPDATE_POOL',
+                               self.fo.get_request_data_for_update_pool(),
+                               self.arg_dict_pool_update )
 
     def test_create_member_rpc_manager(self):
         """Implements test case for create member method
@@ -286,7 +271,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('CREATE_MEMBER')
+        self._test_rpc_manager('CREATE_MEMBER',
+                               self.fo.get_request_data_for_create_member(),
+                               self.arg_dict_member )
 
     def test_delete_member_rpc_manager(self):
         """Implements test case for delete member method
@@ -296,7 +283,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('DELETE_MEMBER')
+        self._test_rpc_manager('DELETE_MEMBER',
+                               self.fo.get_request_data_for_create_member(),
+                               self.arg_dict_member )
 
     def test_update_member_rpc_manager(self):
         """Implements test case for update member method
@@ -305,8 +294,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
         Returns: none
 
         """
-
-        self._test_rpc_manager('UPDATE_MEMBER')
+        self._test_rpc_manager('UPDATE_MEMBER',
+                               self.fo.get_request_data_for_update_member(),
+                               self.arg_dict_member_update )
 
     def test_CREATE_POOL_HEALTH_MONITOR_rpc_manager(self):
         """Implements test case for create pool_health_monitor method
@@ -316,7 +306,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('CREATE_POOL_HEALTH_MONITOR')
+        self._test_rpc_manager('CREATE_POOL_HEALTH_MONITOR',
+                               self.fo.get_request_data_for_create_pool_hm(),
+                               self.arg_dict_health_monitor )
 
     def test_DELETE_POOL_HEALTH_MONITOR_rpc_manager(self):
         """Implements test case for delete pool_health_monitor method
@@ -326,7 +318,9 @@ class LBaaSRpcManagerTest(unittest.TestCase):
 
         """
 
-        self._test_rpc_manager('DELETE_POOL_HEALTH_MONITOR')
+        self._test_rpc_manager('DELETE_POOL_HEALTH_MONITOR',
+                               self.fo.get_request_data_for_create_pool_hm(),
+                               self.arg_dict_health_monitor )
 
     def test_UPDATE_POOL_HEALTH_MONITOR_rpc_manager(self):
         """Implements test case for update pool_health_monitor method
@@ -335,18 +329,19 @@ class LBaaSRpcManagerTest(unittest.TestCase):
         Returns: none
 
         """
-
-        self._test_rpc_manager('UPDATE_POOL_HEALTH_MONITOR')
+        self._test_rpc_manager('UPDATE_POOL_HEALTH_MONITOR',
+                               self.fo.get_request_data_for_update_pool_hm(),
+                               self.arg_dict_health_monitor_update )
 
 """Implement test cases for methods of EventHandler of loadbalancer agent.
 
 """
 
 
-class LBaasHandlerTestCase(unittest.TestCase):
+class LBaasEventHandlerTestCase(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
-        super(LBaasHandlerTestCase, self).__init__(*args, **kwargs)
+        super(LBaasEventHandlerTestCase, self).__init__(*args, **kwargs)
         self.fo = lb_test_data.FakeObjects()
         self.ev = lb_test_data.FakeEvent()
 

@@ -28,10 +28,10 @@ from gbpservice.neutron.unit.nfp.configurator.test_data import (
 """
 
 
-class LbaasDriverTestCase(unittest.TestCase):
+class HaproxyOnVmDriverTestCase(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
-        super(LbaasDriverTestCase, self).__init__(*args, **kwargs)
+        super(HaproxyOnVmDriverTestCase, self).__init__(*args, **kwargs)
         self.fo = lb_test_data.FakeObjects()
         self.driver = lb_driver.HaproxyOnVmDriver()
         self.resp = mock.Mock()
