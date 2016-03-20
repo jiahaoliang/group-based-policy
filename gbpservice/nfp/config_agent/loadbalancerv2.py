@@ -57,7 +57,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
             LOG.error("delete_%s -> request failed.Reason %s" % (
                 name, rce))
 
-    def create_loadbalancer(self, context, loadbalancer, allocate_vip=True):
+    def create_loadbalancer(self, context, loadbalancer, driver_name, allocate_vip=True):
         self._post(
             context, loadbalancer['tenant_id'],
             'loadbalancer', loadbalancer=loadbalancer)
@@ -145,14 +145,20 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
     #             'l7policies': db_data.get_l7policies(**args),
     #             'l7policy_rules': db_data.get_l7policy_rules(**args)}
 
+    def _to_api_dict(self, objs):
+        ret_list = []
+        for obj in objs:
+            ret_list.append(obj.to_api_dict())
+        return ret_list
+
     def _get_lb_context(self, context, filters):
         args = {'context': context, 'filters': filters}
         db_data = super(Lbv2Agent, self)
-        return {'loadbalancers': db_data.get_loadbalancers(**args),
-                'listeners': db_data.get_listeners(**args),
-                'pools': db_data.get_pools(**args),
-                'pool_members': db_data.get_pool_members(**args),
-                'healthmonitors': db_data.get_healthmonitors(**args)}
+        return {'loadbalancers': self._to_api_dict(db_data.get_loadbalancers(**args)),
+                'listeners': self._to_api_dict(db_data.get_listeners(**args)),
+                'pools': self._to_api_dict(db_data.get_pools(**args)),
+                'pool_members': self._to_api_dict(db_data.get_pool_members(**args)),
+                'healthmonitors': self._to_api_dict(db_data.get_healthmonitors(**args))}
 
     def _context(self, context, tenant_id):
         if context.is_admin:
