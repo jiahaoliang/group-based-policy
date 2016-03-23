@@ -10,14 +10,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from neutron.i18n import _LE, _LI
-from neutron_lbaas.services.loadbalancer import data_models
-from gbpservice.nfp.config_agent.common import *
-from gbpservice.nfp.config_agent import RestClientOverUnix as rc
-from neutron_lbaas.agent import agent_manager
-from neutron_lbaas.agent import agent_api
 from neutron_lbaas.db.loadbalancer import loadbalancer_dbv2
-from gbpservice.nfp.config_agent import topics
+from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
+from gbpservice.nfp.config_orchestrator.agent.common import *
+from gbpservice.nfp.lib.transport import *
+
 
 LOG = logging.getLogger(__name__)
 
@@ -37,12 +34,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         context_dict.update({'service_info': db})
         kwargs.update({'context': context_dict})
         body = prepare_request_data(name, kwargs, "loadbalancer")
-        try:
-            resp, content = rc.post(
-                'create_network_function_config', body=body)
-        except rc.RestClientException as rce:
-            LOG.error("create_%s -> request failed. Reason %s" % (
-                name, rce))
+        send_request_to_configurator(self._conf, context, body, "CREATE")
 
     def _delete(self, context, tenant_id, name, **kwargs):
         db = self._context(context, tenant_id)
@@ -50,12 +42,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         context_dict.update({'service_info': db})
         kwargs.update({'context': context_dict})
         body = prepare_request_data(name, kwargs, "loadbalancer")
-        try:
-            resp, content = rc.post('delete_network_function_config',
-                                    body=body, delete=True)
-        except rc.RestClientException as rce:
-            LOG.error("delete_%s -> request failed.Reason %s" % (
-                name, rce))
+        send_request_to_configurator(self._conf, context, body, "DELETE")
 
     def create_loadbalancer(self, context, loadbalancer, driver_name, allocate_vip=True):
         self._post(
@@ -169,10 +156,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         return db
 
     def _get_core_context(self, context, filters):
-        args = {'context': context, 'filters': filters}
-        core_plugin = self._core_plugin
-        return {'subnets': core_plugin.get_subnets(**args),
-                'ports': core_plugin.get_ports(**args)}
+        core_context_dict = get_core_context(context, filters, self._conf.host)
+        del core_context_dict['routers']
+        return core_context_dict
 
 
 # class Lbv2Agent(agent_manager.LbaasAgentManager):

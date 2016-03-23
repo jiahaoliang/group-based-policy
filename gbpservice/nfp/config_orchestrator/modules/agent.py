@@ -12,6 +12,7 @@ from gbpservice.nfp.core.rpc import RpcAgent
 from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
 from gbpservice.nfp.config_orchestrator.agent.firewall import *
 from gbpservice.nfp.config_orchestrator.agent.loadbalancer import *
+from gbpservice.nfp.config_orchestrator.agent.loadbalancerv2 import *
 from gbpservice.nfp.config_orchestrator.agent.vpn import *
 from gbpservice.nfp.config_orchestrator.agent.generic import *
 from gbpservice.nfp.config_orchestrator.agent.rpc_cb import *
@@ -51,6 +52,25 @@ def rpc_init(sc, conf):
         report_state=lb_report_state
     )
 
+    lbv2_report_state = {
+        'binary': 'oc-lb-agent',
+        'host': cfg.CONF.host,
+        'topic': a_topics.LBV2_NFP_CONFIGAGENT_TOPIC,
+        'plugin_topic': a_topics.LBV2_NFP_PLUGIN_TOPIC,
+        'agent_type': 'NFP Loadbalancer agent',
+        'configurations': {'device_drivers': ['loadbalancer']},
+        'start_flag': True,
+        'report_interval': conf.reportstate_interval
+    }
+    lbv2rpcmgr = Lbv2Agent(conf, sc)
+    lbv2agent = RpcAgent(
+        sc,
+        host=cfg.CONF.host,
+        topic=a_topics.LBV2_NFP_CONFIGAGENT_TOPIC,
+        manager=lbv2rpcmgr,
+        report_state=lbv2_report_state
+    )
+
     vpn_report_state = {
         'binary': 'oc-vpn-agent',
         'host': cfg.CONF.host,
@@ -70,7 +90,7 @@ def rpc_init(sc, conf):
         report_state=vpn_report_state
     )
 
-    sc.register_rpc_agents([fwagent, lbagent, vpnagent])
+    sc.register_rpc_agents([fwagent, lbagent, lbv2agent, vpnagent])
 
 
 def events_init(sc, conf):
