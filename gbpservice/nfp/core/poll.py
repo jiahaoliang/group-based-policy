@@ -10,7 +10,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import copy
 import os
 import Queue
 import random
@@ -158,7 +157,7 @@ class PollingTask(oslo_periodic_task.PeriodicTasks):
         pulse.start(
             interval=oslo_config.CONF.periodic_interval, initial_delay=None)
 
-    @oslo_periodic_task.periodic_task(spacing=1)
+    @oslo_periodic_task.periodic_task(spacing=2)
     def periodic_sync_task(self, context):
         log_debug(LOG, "Periodic sync task invoked !")
         # invoke the common class to handle event timeouts
@@ -178,14 +177,16 @@ class PollingTask(oslo_periodic_task.PeriodicTasks):
 
 class PollQueueHandler(object):
 
-    def __init__(self, sc, qu, ehs, batch=-1):
+    def __init__(self, sc, qu, squ, ehs, batch=-1):
         self._sc = sc
         self._ehs = ehs
         self._pollq = qu
+        self._stashq = squ
         self._procidx = 0
         self._procpending = 0
         self._batch = 10 if batch == -1 else batch
         self._cache = nfp_fifo.Fifo(sc)
+        self._stash_cache = nfp_fifo.Fifo(sc)
 
     def _get(self):
         """Internal method to get messages from pollQ.
@@ -197,16 +198,78 @@ class PollQueueHandler(object):
         except Queue.Empty:
             return None
 
-    def _cancelled(self, ev):
-        """To cancel an event.
+    def event_life_timedout(self, eh, event):
+        try:
+            eh.event_cancelled(event.data)
+        except AttributeError:
+            log_info(LOG,
+                     "Handler %s does not implement"
+                     "event_cancelled method" % (identify(eh)))
 
-            Removes the event from internal cache and scheds the
-            event to worker to handle any cleanup.
-        """
-        log_info(LOG, "Poll event %s cancelled" % (ev.identify()))
-        ev.poll_event = 'POLL_EVENT_CANCELLED'
-        self._event_done(ev)
-        self._sc.post_event(ev)
+    def event_timedout(self, eh, event):
+        if isinstance(eh, PollEventDesc):
+            # Check if this event has a decorated timeout method
+            peh = eh.get_poll_event_desc(event)
+            if peh:
+                ret = peh(eh, event)
+                log_info(LOG,
+                         "Invoking method %s of handler %s"
+                         "for event %s "
+                         % (identify(peh), identify(eh),
+                            event.identify()))
+
+            else:
+                ret = eh.handle_poll_event(event)
+                log_info(LOG,
+                         "Invoking handle_poll_event() of handler %s"
+                         "for event %s"
+                         % (identify(eh),
+                            event.identify()))
+        else:
+            ret = eh.handle_poll_event(event)
+            log_info(LOG,
+                     "Invoking handle_poll_event() of handler %s"
+                     "for event %s "
+                     % (identify(eh),
+                        event.identify()))
+
+        self._event_dispatched(eh, event, ret)
+
+    def _poll_event_cancelled(self, eh, event):
+        try:
+            log_info(LOG,
+                     "Event %s cancelled"
+                     "invoking %s handler's poll_event_cancel method"
+                     % (event.identify(), identify(eh)))
+            return eh.poll_event_cancel(event)
+        except AttributeError:
+            log_info(LOG,
+                     "Handler %s does not implement"
+                     "poll_event_cancel method" % (identify(eh)))
+        finally:
+            return
+
+    def _get_empty_status(self, event, ret):
+        status = {'poll': True, 'event': event}
+        if ret and 'event' in ret.keys():
+            status['event'] = ret['event']
+        if ret and 'poll' in ret.keys():
+            status['poll'] = ret['poll']
+        return status
+
+    def _event_dispatched(self, eh, event, ret):
+        status = self._get_empty_status(event, ret)
+        uevent = status['event']
+        poll = status['poll']
+
+        uevent.max_times = event.max_times - 1
+
+        if not uevent.max_times:
+            return self._poll_event_cancelled(eh, event)
+
+        if poll:
+            uevent.serialize = False
+            return self._sc.poll_event(uevent, max_times=uevent.max_times)
 
     def _schedule(self, ev):
         """Schedule the event to approp worker.
@@ -239,31 +302,30 @@ class PollQueueHandler(object):
             return ev
         return None
 
-    def _process_event(self, ev):
-        """Process different type of poll event. """
-
-        log_debug(LOG, "Processing poll event %s" % (ev.identify()))
-        if ev.id == 'NOTIFICATION_EVENT':
-            return
-        if ev.id == 'POLL_EVENT_DONE':
-            return self._event_done(ev)
-        copyev = copy.deepcopy(ev)
-        copyev.serialize = False
-        copyev.poll_event = 'POLL_EVENT'
-        if copyev.max_times == 0:
-            return self._cancelled(copyev)
-        if self._schedule(copyev):
-            ev.max_times -= 1
-            ev.last_run = copyev.last_run
-
-    def _event_done(self, ev):
+    def _scheduled(self, ev):
         """Marks the event as complete.
 
             Invoked by caller to mark the event as complete.
             Removes the event from internal cache.
         """
-        log_info(LOG, "Poll event %s to be marked done !" % (ev.identify()))
-        self.remove(ev)
+        self._cache.remove([ev])
+
+    def _process_event(self, cache, ev):
+        """Process different type of poll event. """
+
+        log_debug(LOG, "Processing poll event %s" % (ev.identify()))
+        if ev.id == 'POLL_EVENT_DONE':
+            return self._scheduled(ev)
+
+        if ev.id == 'EVENT_LIFE_TIMEOUT':
+            ev.max_times -= 1
+            if ev.max_times:
+                return
+        ev.poll_event = 'POLL_EVENT'
+        ev.serialize  = False
+        ev = self._schedule(ev)
+        if ev:
+            self._scheduled(ev)
 
     def add(self, event):
         """Adds an event to the pollq.
@@ -274,26 +336,21 @@ class PollQueueHandler(object):
         log_debug(LOG, "Add event %s to the pollq" % (event.identify()))
         self._pollq.put(event)
 
-    def remove(self, event):
-        """Remove an event from polling cache.
+    def s_add(self, event):
+        """Adds an event to the pollq.
 
-            All the events which matches with the event.key
-            are removed from cache.
+            Invoked in context of worker process
+            to send event to polling task.
         """
-        log_info(LOG, "Remove event %s from pollq" % (event.identify()))
-        log_info(LOG,
-                 "Removing all poll events with key %s" % (event.identify()))
-        remevs = []
-        cache = self._cache.copy()
-        for elem in cache:
-            if elem.key == event.key:
-                log_info(LOG,
-                         "Event %s key matched event %s key - "
-                         "removing event %s from pollq"
-                         % (elem.identify(), event.identify(),
-                            elem.identify()))
-                remevs.append(elem)
-        self._cache.remove(remevs)
+        log_debug(LOG, "Add event %s to the pollq" % (event.identify()))
+        self._stashq.put(event)
+
+    def s_get(self):
+        """Get the event from stashq. """
+        try:
+            return self._stashq.get(timeout=0.1)
+        except Queue.Empty:
+            return None
 
     def fill(self):
         """Fill polling cache with events from poll queue.
@@ -313,6 +370,24 @@ class PollQueueHandler(object):
                           % (ev.identify()))
                 self._cache.put(ev)
 
+    def s_fill(self):
+        """Fill stashing cache with events from stash queue.
+
+            Fetch messages from stash queue which is
+            python mutiprocessing.queue and fill local cache.
+            Events need to persist and polled they are declated complete
+            or cancelled.
+        """
+        log_debug(LOG, "Fill events from multi processing Q to internal cache")
+        for i in range(0, 10):
+            ev = self.s_get()
+
+            if ev:
+                log_error(LOG,
+                          "Got new event %s from multi processing Q"
+                          % (ev.identify()))
+                self._stash_cache.put(ev)
+
     def peek(self, idx, count):
         """Peek for events instead of popping.
 
@@ -327,21 +402,27 @@ class PollQueueHandler(object):
         qlen = len(cache)
         log_debug(LOG, "Number of elements in poll q - %d" % (qlen))
         pull = qlen if (idx + count) > qlen else count
-        return cache[idx:(idx + pull)], pull
+        # return cache[idx:(idx + pull)], pull
+        return cache, cache[0:pull], pull
 
-    def get_notification_event(self):
-        copy = self._cache.copy()
+    def add_stash_event(self, ev):
+        """Add stash event in the cache. """
+        return self.s_add(ev)
+
+    def get_stash_event(self):
+        """Get the stach event from cache. """
+        copy = self._stash_cache.copy()
         for ev in copy:
-            if ev.id == 'NOTIFICATION_EVENT':
-                self._cache.remove([ev])
-                return ev
+            self._stash_cache.remove([ev])
+            return ev
 
     def run(self):
         """Invoked in loop of periodic task to check for timedout events. """
         # Fill the cache first
         self.fill()
+        self.s_fill()
         # Peek the events from cache
-        evs, count = self.peek(0, self._batch)
+        cache, evs, count = self.peek(0, self._batch)
         for ev in evs:
-            self._process_event(ev)
-        self._procidx = (self._procidx + count) % (self._batch)
+            self._process_event(cache, ev)
+        # self._procidx = (self._procidx + count) % (self._batch)

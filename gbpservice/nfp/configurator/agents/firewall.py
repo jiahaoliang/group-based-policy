@@ -1,22 +1,21 @@
-# One Convergence, Inc. CONFIDENTIAL
-# Copyright (c) 2012-2016, One Convergence, Inc., USA
-# All Rights Reserved.
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
 #
-# All information contained herein is, and remains the property of
-# One Convergence, Inc. and its suppliers, if any. The intellectual and
-# technical concepts contained herein are proprietary to One Convergence,
-# Inc. and its suppliers.
+#         http://www.apache.org/licenses/LICENSE-2.0
 #
-# Dissemination of this information or reproduction of this material is
-# strictly forbidden unless prior written permission is obtained from
-# One Convergence, Inc., USA
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
 
 import os
+import oslo_messaging as messaging
+import requests
 
 from oslo_config import cfg
 from oslo_log import log as logging
-import oslo_messaging as messaging
-from requests import ConnectionError
 
 from gbpservice.nfp.configurator.agents import agent_base
 from gbpservice.nfp.configurator.lib import fw_constants as const
@@ -29,48 +28,32 @@ LOG = logging.getLogger(__name__)
 rest_timeout = [
     cfg.IntOpt(
         'rest_timeout',
-        default=30,
+        default=360,
         help=_("rest api timeout"))]
 cfg.CONF.register_opts(rest_timeout)
 
-OPTS = [
-    cfg.IntOpt('oc_periodic_interval', default=10, help='Define periodic '
-                                                        'interval for tasks'),
-    cfg.IntOpt('oc_report_interval', default=10,
-               help='Reporting interval from agent to firewall plugin')
-]
-GROUP_OPTS = cfg.OptGroup(name='ocfwaas', title='OC FW OPTIONS')
-cfg.CONF.register_group(GROUP_OPTS)
-cfg.CONF.register_opts(OPTS, group=GROUP_OPTS)
+""" Implements Fwaas response path to Neutron plugin.
 
-
-"""Implements APIs invoked by configurator for processing RPC messages.
-
-RPC client of configurator module receives RPC messages from REST server
-and invokes the API of this class. The instance of this class is registered
-with configurator module using register_service_agent API. Configurator module
-identifies the service agent object based on service type and invokes ones of
-the methods of this class to configure the device.
+Methods of this class are invoked by the FwaasEventHandler class
+for sending response from driver to the Fwaas Neutron plugin.
 
 """
 
 
-class FwaasRpcSender(object):
-    """ APIs to FWaaS Plugin.
-    """
+class FwaasRpcSender(agent_base.AgentBaseEventHandler):
 
-    def __init__(self, sc, host, nqueue):
-        self.sc = sc
+    def __init__(self, sc, host, drivers, rpcmgr):
+        super(FwaasRpcSender, self).__init__(sc, drivers, rpcmgr)
         self.host = host
-        self.qu = nqueue
-
-    def _notification(self, data):
-        event = self.sc.new_event(
-            id='NOTIFICATION_EVENT', key='NOTIFICATION_EVENT', data=data)
-        self.sc.poll_event(event)
 
     def set_firewall_status(self, context, firewall_id, status):
-        """Make an RPC to set the status of a firewall."""
+        """ Enqueues the response from FwaaS operation to neutron plugin.
+
+        :param context: Neutron context
+        :param firewall_id: id of firewall resource
+        :param status: ACTIVE/ ERROR
+
+        """
 
         msg = {'receiver': const.NEUTRON,
                'resource': const.SERVICE_TYPE,
@@ -80,11 +63,15 @@ class FwaasRpcSender(object):
                           'firewall_id': firewall_id,
                           'status': status}
                }
-        self._notification(msg)
-	#self.qu.put(msg)
+        self.notify._notification(msg)
 
     def firewall_deleted(self, context, firewall_id):
-        """Make an RPC to indicate that the firewall resources are deleted."""
+        """ Enqueues the response from FwaaS operation to neutron plugin.
+
+        :param context: Neutron context
+        :param firewall_id: id of firewall resource
+
+        """
 
         msg = {'receiver': const.NEUTRON,
                'resource': const.SERVICE_TYPE,
@@ -93,8 +80,15 @@ class FwaasRpcSender(object):
                           'host': self.host,
                           'firewall_id': firewall_id}
                }
-        self._notification(msg)
-	#self.qu.put(msg)
+        self.notify._notification(msg)
+
+""" Implements FWaasRpcManager class which receives requests
+    from Configurator to Agent.
+
+Methods of this class are invoked by the configurator. Events are
+created according to the requests received and enqueued to worker queues.
+
+"""
 
 
 class FWaasRpcManager(agent_base.AgentBaseRPCManager):
@@ -104,12 +98,8 @@ class FWaasRpcManager(agent_base.AgentBaseRPCManager):
     def __init__(self, sc, conf):
         """Instantiates child and parent class objects.
 
-        Passes the instances of core service controller and oslo configuration
-        to parent instance in order to provide event enqueue facility for batch
-        processing event.
-
-        :param sc: Service Controller object that is used for interfacing
-        with core service controller.
+        :param sc: Service Controller object that is used to communicate
+        with process model core file.
         :param conf: Configuration object that is used for configuration
         parameter access.
 
@@ -117,56 +107,106 @@ class FWaasRpcManager(agent_base.AgentBaseRPCManager):
 
         super(FWaasRpcManager, self).__init__(sc, conf)
 
-    def create_firewall(self, context, firewall, host):
-        LOG.debug("FwaasRpcReceiver received Create Firewall request.")
+    def _create_event(self, context, firewall, host, method):
+        """ Creates and enqueues the events to the worker queues.
+
+        :param context: Neutron context
+        :param firewall: Firewall resource object from neutron fwaas plugin
+        :param host: Name of the host machine
+        :param method: CREATE_FIREWALL/UPDATE_FIREWALL/DELETE_FIREWALL
+
+        """
+
         arg_dict = {'context': context,
                     'firewall': firewall,
                     'host': host}
-        ev = self._sc.new_event(id='CREATE_FIREWALL', data=arg_dict)
-        self._sc.post_event(ev)
+        ev = self.sc.new_event(id=method, data=arg_dict, key=None)
+        self.sc.post_event(ev)
+
+    def create_firewall(self, context, firewall, host):
+        """ Receives request to create firewall from configurator
+
+        """
+
+        msg = ("FwaasRpcReceiver received Create Firewall request.")
+        LOG.debug(msg)
+        self._create_event(context, firewall,
+                           host, const.FIREWALL_CREATE_EVENT)
 
     def update_firewall(self, context, firewall, host):
-        LOG.debug("FwaasRpcReceiver received Update Firewall request.")
-        arg_dict = {'context': context,
-                    'firewall': firewall,
-                    'host': host}
-        ev = self._sc.new_event(id='UPDATE_FIREWALL', data=arg_dict)
-        self._sc.post_event(ev)
+        """ Receives request to update firewall from configurator
+
+        """
+
+        msg = ("FwaasRpcReceiver received Update Firewall request.")
+        LOG.debug(msg)
+        self._create_event(context, firewall,
+                           host, const.FIREWALL_UPDATE_EVENT)
 
     def delete_firewall(self, context, firewall, host):
-        LOG.debug("FwaasRpcReceiver received Delete Firewall request.")
-        arg_dict = {'context': context,
-                    'firewall': firewall,
-                    'host': host}
-        ev = self._sc.new_event(id='DELETE_FIREWALL', data=arg_dict)
-        self._sc.post_event(ev)
+        """ Receives request to delete firewall from configurator
+
+        """
+
+        msg = ("FwaasRpcReceiver received Delete Firewall request.")
+        LOG.debug(msg)
+        self._create_event(context, firewall,
+                           host, const.FIREWALL_DELETE_EVENT)
+
+""" Handler class which invokes firewall driver methods
+
+Worker processes dequeue the worker queues and invokes the
+appropriate handler class methods for Fwaas methods.
+
+"""
 
 
 class FWaasEventHandler(object):
-    """
-    Handler class for demultiplexing firewall configuration
-    requests from Fwaas Plugin and sending to appropriate driver.
-    """
+    def __init__(self, sc, drivers, rpcmgr):
+        """ Instantiates class object.
 
-    def __init__(self, sc, drivers, rpcmgr, nqueue):
-        self._sc = sc
+        :param sc: Service Controller object that is used to communicate
+        with process model core file.
+        :param drivers: dictionary of driver name to object mapping
+        :param rpcmgr: FwaasRpcManager class object
+
+        """
+
+        self.sc = sc
         self.drivers = drivers
         self.host = cfg.CONF.host
-        self._rpcmgr = rpcmgr
-        self.plugin_rpc = FwaasRpcSender(
-            sc, self.host, nqueue)
+        self.rpcmgr = rpcmgr
+        self.plugin_rpc = FwaasRpcSender(sc, self.host,
+                                         self.drivers, self.rpcmgr)
 
     def _get_driver(self):
+        """ Retrieves driver object given the service type
+
+        """
+
         driver_id = const.SERVICE_TYPE
         return self.drivers[driver_id]
 
     def _is_firewall_rule_exists(self, fw):
+        """ Checks if firewall rules are present in the request data
+
+        :param fw: Firewall resource object
+
+        """
+
         if not fw['firewall_rule_list']:
             return False
         else:
             return True
 
     def handle_event(self, ev):
+        """ Demultiplexes the firewall request to appropriate
+        driver methods.
+
+        :param ev: event object sent from process model event handler
+
+        """
+
         try:
             msg = ("Worker process with ID: %s starting to "
                    "handle task: %s of type firewall. "
@@ -177,15 +217,22 @@ class FWaasEventHandler(object):
             self.method = getattr(driver, "%s" % (ev.id.lower()))
             self.invoke_driver_for_plugin_api(ev)
         except Exception as err:
-            LOG.error("Failed to perform the operation: %s. %s"
-                      % (ev.id, str(err).capitalize()))
+            msg = ("Failed to perform the operation: %s. %s"
+                   % (ev.id, str(err).capitalize()))
+            LOG.error(msg)
 
     def invoke_driver_for_plugin_api(self, ev):
+        """ Invokes the appropriate driver methods
+
+        :param ev: event object sent from process model event handler
+
+        """
+
         context = ev.data.get('context')
         firewall = ev.data.get('firewall')
         host = ev.data.get('host')
 
-        if ev.id == 'CREATE_FIREWALL':
+        if ev.id == const.FIREWALL_CREATE_EVENT:
             if not self._is_firewall_rule_exists(firewall):
                 msg = ("Firewall status set to ACTIVE")
                 LOG.debug(msg)
@@ -210,23 +257,24 @@ class FWaasEventHandler(object):
                 msg = ("Configured Firewall and status set to %s" % status)
                 LOG.info(msg)
 
-        elif ev.id == 'DELETE_FIREWALL':
+        elif ev.id == const.FIREWALL_DELETE_EVENT:
             if not self._is_firewall_rule_exists(firewall):
                 return self.plugin_rpc.firewall_deleted(context,
                                                         firewall['id'])
             try:
                 status = self.method(context, firewall, host)
-            except ConnectionError:
-                # FIXME(Vikash) It can't be correct everytime
-                LOG.warning("There is a connection error for firewall %r of "
-                            "tenant %r. Assuming either there is serious "
-                            "issue with VM or data path is completely "
-                            "broken. For now marking that as delete."
-                            % (firewall['id'], firewall['tenant_id']))
+            except requests.ConnectionError:
+                # FIXME It can't be correct everytime
+                msg = ("There is a connection error for firewall %r of "
+                       "tenant %r. Assuming either there is serious "
+                       "issue with VM or data path is completely "
+                       "broken. For now marking that as delete."
+                       % (firewall['id'], firewall['tenant_id']))
+                LOG.warning(msg)
                 self.plugin_rpc.firewall_deleted(context, firewall['id'])
 
             except Exception as err:
-                # TODO(Vikash) Is it correct to raise ? As the subsequent
+                # TODO(VIKASH) Is it correct to raise ? As the subsequent
                 # attempt to clean will only re-raise the last one.And it
                 # can go on and on and may not be ever recovered.
                 self.plugin_rpc.set_firewall_status(
@@ -240,12 +288,13 @@ class FWaasEventHandler(object):
                     self.plugin_rpc.set_firewall_status(
                         context, firewall['id'], status)
                 else:
-                    LOG.info("Firewall %r deleted of tenant: %r" % (
-                            firewall['id'], firewall['tenant_id']))
+                    msg = ("Firewall %r deleted of tenant: %r" % (
+                           firewall['id'], firewall['tenant_id']))
+                    LOG.info(msg)
                     self.plugin_rpc.firewall_deleted(
                                         context, firewall['id'])
 
-        elif ev.id == 'UPDATE_FIREWALL':
+        elif ev.id == const.FIREWALL_UPDATE_EVENT:
             if not self._is_firewall_rule_exists(firewall):
                 return self.plugin_rpc.set_firewall_status(
                     context, firewall['id'], const.STATUS_ACTIVE)
@@ -263,21 +312,42 @@ class FWaasEventHandler(object):
                 msg = ("Updated Firewall and status set to %s" % status)
                 LOG.info(msg)
         else:
-            raise Exception("Wrong call to Fwaas event handler.")
+            msg = ("Wrong call to Fwaas event handler.")
+            raise Exception(msg)
 
 
-def events_init(sc, drivers, rpcmgr, nqueue):
-    evs = [
-        main.Event(id='CREATE_FIREWALL', handler=FWaasEventHandler(
-                                            sc, drivers, rpcmgr, nqueue)),
-        main.Event(id='UPDATE_FIREWALL', handler=FWaasEventHandler(
-                                            sc, drivers, rpcmgr, nqueue)),
-        main.Event(id='DELETE_FIREWALL', handler=FWaasEventHandler(
-                                            sc, drivers, rpcmgr, nqueue))]
+def events_init(sc, drivers, rpcmgr):
+    """Registers events with core service controller.
+
+    All the events will come to handle_event method of class instance
+    registered in 'handler' field.
+
+    :param drivers: Driver instances registered with the service agent
+    :param rpcmgr: Instance to receive all the RPC messages from configurator
+    module.
+
+    Returns: None
+
+    """
+
+    event_id_list = [const.FIREWALL_CREATE_EVENT,
+                     const.FIREWALL_UPDATE_EVENT,
+                     const.FIREWALL_DELETE_EVENT]
+    evs = []
+    for event in event_id_list:
+        evs.append(main.Event(id=event, handler=FWaasEventHandler(
+                              sc, drivers, rpcmgr)))
     sc.register_events(evs)
 
 
 def load_drivers():
+    """Imports all the driver files.
+
+    Returns: Dictionary of driver objects with a specified service type and
+    vendor name
+
+    """
+
     ld = load_driver.ConfiguratorUtils()
     drivers = ld.load_drivers(const.DRIVERS_DIR)
 
@@ -289,42 +359,71 @@ def load_drivers():
 
 
 def register_service_agent(cm, sc, conf, rpcmgr):
+    """Registers Fwaas service agent with configurator module.
+
+    :param cm: Instance of configurator module
+    :param sc: Instance of core service controller
+    :param conf: Instance of oslo configuration
+    :param rpcmgr: Instance containing RPC methods which are invoked by
+    configurator module on corresponding RPC message arrival
+
+    """
+
     service_type = const.SERVICE_TYPE
     cm.register_service_agent(service_type, rpcmgr)
 
 
-def init_agent(cm, sc, conf, nqueue):
+def init_agent(cm, sc, conf):
+    """Initializes Fwaas agent.
+
+    :param cm: Instance of configuration module
+    :param sc: Instance of core service controller
+    :param conf: Instance of oslo configuration
+
+    """
+
     try:
         drivers = load_drivers()
     except Exception as err:
-        LOG.error("Fwaas failed to load drivers. %s"
-                  % (str(err).capitalize()))
-        raise err
+        msg = ("Fwaas failed to load drivers. %s"
+               % (str(err).capitalize()))
+        LOG.error(msg)
+        raise Exception(err)
     else:
-        LOG.debug("Fwaas loaded drivers successfully.")
+        msg = ("Fwaas loaded drivers successfully.")
+        LOG.debug(msg)
 
     rpcmgr = FWaasRpcManager(sc, conf)
     try:
-        events_init(sc, drivers, rpcmgr, nqueue)
+        events_init(sc, drivers, rpcmgr)
     except Exception as err:
-        LOG.error("Fwaas Events initialization unsuccessful. %s"
-                  % (str(err).capitalize()))
-        raise err
+        msg = ("Fwaas Events initialization unsuccessful. %s"
+               % (str(err).capitalize()))
+        LOG.error(msg)
+        raise Exception(err)
     else:
-        LOG.debug("Fwaas Events initialization successful.")
+        msg = ("Fwaas Events initialization successful.")
+        LOG.debug(msg)
 
     try:
         register_service_agent(cm, sc, conf, rpcmgr)
     except Exception as err:
-        LOG.error("Fwaas service agent registration unsuccessful. %s"
-                  % (str(err).capitalize()))
-        raise err
+        msg = ("Fwaas service agent registration unsuccessful. %s"
+               % (str(err).capitalize()))
+        LOG.error(msg)
+        raise Exception(err)
     else:
-        LOG.debug("Fwaas service agent registration successful.")
+        msg = ("Fwaas service agent registration successful.")
+        LOG.debug(msg)
 
     msg = ("FIREWALL as a Service Module Initialized.")
     LOG.info(msg)
 
 
 def init_agent_complete(cm, sc, conf):
-    LOG.info(" Firewall agent init complete")
+    """ Initializes periodic tasks
+
+    """
+
+    msg = (" Firewall agent init complete")
+    LOG.info(msg)

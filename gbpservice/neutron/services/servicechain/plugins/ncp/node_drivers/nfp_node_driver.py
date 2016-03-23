@@ -29,6 +29,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
 
 from gbpservice.common import utils
+from gbpservice.nfp.common import constants as nfp_constants
 from gbpservice.nfp.common import topics as nfp_rpc_topics
 from gbpservice.neutron.services.servicechain.plugins.ncp import (
     exceptions as exc)
@@ -155,7 +156,7 @@ class NFPClientApi(object):
 
     def create_network_function(self, context, network_function):
         cctxt = self.client.prepare(
-            fanout=False, topic=nfp_rpc_topics.NFP_SERVICE_LCM_TOPIC)
+            fanout=False, topic=nfp_rpc_topics.NFP_NSO_TOPIC)
         return cctxt.call(
             context,
             'create_network_function',
@@ -281,7 +282,7 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
         return self.conn.consume_in_threads()
 
     def _setup_rpc(self):
-        self.nfp_notifier = NFPClientApi(nfp_rpc_topics.NFP_SERVICE_LCM_TOPIC)
+        self.nfp_notifier = NFPClientApi(nfp_rpc_topics.NFP_NSO_TOPIC)
 
     def get_plumbing_info(self, context):
         context._plugin_context = self._get_resource_owner_context(
@@ -394,11 +395,12 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
                 return
             context._plugin_context = self._get_resource_owner_context(
                 context._plugin_context)
-            network_function_id = self._get_node_instance_network_function_map(
+            network_function_map = self._get_node_instance_network_function_map(
                 context.plugin_session,
                 context.current_node['id'],
                 context.instance['id'])
-            if network_function_id:
+            if network_function_map:
+                network_function_id = network_function_map.network_function_id
                 self.nfp_notifier.policy_target_added_notification(
                     context.plugin_context, network_function_id, policy_target)
 
@@ -483,6 +485,7 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
             if not network_function:
                 LOG.error(_("Failed to retrieve network function"))
                 eventlet.sleep(5)
+                time_waited = time_waited + 5
                 continue
             else:
                 LOG.info(_("Create network function result: %(network_function)s"), {'network_function': network_function})
@@ -631,15 +634,19 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
             if not vip_ip:
                 raise VipNspNotSetonProvider()
 
-            for provider_port in service_targets['provider_ports']:
-                provider_port['allowed_address_pairs'] = [
-                    {'ip_address': vip_ip}]
-                port = {
-                    'port': provider_port
-                }
-                context.core_plugin.update_port(
-                    context.plugin_context, provider_port['id'], port)
-
+        port_info = [
+            {
+                'id': service_targets['provider_pts'][0],
+                'port_model': nfp_constants.GBP_PORT,
+                'port_classification': nfp_constants.PROVIDER,
+            }
+        ]
+        if service_targets.get('consumer_ports'):
+            port_info.append({
+                'id': service_targets['consumer_pts'][0],
+                'port_model': nfp_constants.GBP_PORT,
+                'port_classification': nfp_constants.CONSUMER,
+            })
         network_function = {
             'tenant_id': context.provider['tenant_id'],
             'service_chain_id': sc_instance['id'],
@@ -647,13 +654,9 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
             'service_profile_id': context.current_profile['id'],
             'management_ptg_id': sc_instance['management_ptg_id'],
             'service_config': context.current_node.get('config'),
-            'provider_port_id': service_targets['provider_pts'][0],
-            'network_function_mode': 'GBP',
+            'port_info': port_info,
+            'network_function_mode': nfp_constants.GBP_MODE,
         }
-
-        if service_targets.get('consumer_ports'):
-            network_function['consumer_port_id'] = service_targets[
-                'consumer_pts'][0]
 
         return self.nfp_notifier.create_network_function(
             context.plugin_context, network_function=network_function)['id']

@@ -1,20 +1,46 @@
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import os
 import sys
 import inspect
+
+"""Utility class which provides common library functions for configurator.
+   New common library functions, if needed, should be added in this class.
+"""
 
 
 class ConfiguratorUtils(object):
     def __init__(self):
         pass
 
-    def load_drivers(self, drivers_dir):
+    def load_drivers(self, pkg):
+        """Load all the driver class objects inside pkg. In each class in the
+           pkg it will look for keywork 'service_type' or/and 'vendor' and
+           select that class as driver class
+
+        @param pkg : package
+        e.g pkg = 'gbpservice.neutron.nsf.configurator.drivers.firewall'
+
+        Returns: driver_objects dictionary
+               e.g driver_objects = {'loadbalancer': <driver class object>}
 
         """
-        @param drivers_dir : absolute path
-        e.g drivers_dir = '/usr/lib/python2.7/dist-packages/gbpservice/
-                           nfp/configurator/drivers/loadbalancer'
-        """
         driver_objects = {}
+
+        base_driver = __import__(pkg,
+                                 globals(), locals(), ['drivers'], -1)
+        drivers_dir = base_driver.__path__[0]
+
         modules = []
         subdirectories = [x[0] for x in os.walk(drivers_dir)]
         for subd in subdirectories:
@@ -45,9 +71,13 @@ class ConfiguratorUtils(object):
         return driver_objects
 
     def load_agents(self, pkg):
-        """
+        """Load all the agents inside pkg.
+
         @param pkg : package
         e.g pkg = 'gbpservice.neutron.nsf.configurator.agents'
+
+        Returns: imported_service_agents list
+
         """
         imported_service_agents = []
         base_agent = __import__(pkg,

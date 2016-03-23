@@ -52,13 +52,13 @@ OPTS = [
     ),
     cfg.StrOpt(
         'modules_dir',
-        default='gbpservice.nfp.modules',
+        default='gbpservice.nfp.core.test',
         help='Path for NFP modules.'
         'All modules from this path are autloaded by framework'
     ),
     cfg.IntOpt(
         'periodic_interval',
-        default=10,
+        default=2,
         help='Interval for event polling task in seconds.'
         'Polling task wakesup with this interval and'
         'checks for timedout events.'
@@ -69,5 +69,10 @@ OPTS = [
         help='Interval for report state task in seconds.'
         'Reporting task will report neutron agents state'
         'to the plugins at this interval'
+    ),
+    cfg.BoolOpt(
+        'core_debug',
+        default=False,
+        help='Main debug'
     )
 ]
