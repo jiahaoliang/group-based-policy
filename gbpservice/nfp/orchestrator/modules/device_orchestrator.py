@@ -396,9 +396,9 @@ class DeviceOrchestrator(object):
         device_data['compute_policy'] = 'nova'
         # To get the network mode, fetch it from port_info
         if nsi_port_info[0]['port_model'] == nfp_constants.GBP_PORT:
-            device_data['network_model'] = nfp_constants.GBP_NETWORK
+            device_data['network_model'] = nfp_constants.GBP_MODE
         else:
-            device_data['network_model'] = nfp_constants.NEUTRON_NETWORK
+            device_data['network_model'] = nfp_constants.NEUTRON_MODE
         return device_data
 
     def _get_nsf_db_resource(self, resource_name, resource_id):
@@ -635,7 +635,10 @@ class DeviceOrchestrator(object):
         mgmt_port_id = self._get_port(mgmt_port_id)
         device['mgmt_port_id'] = mgmt_port_id
         device['compute_policy'] = 'nova'
-        device['network_model'] = mgmt_port_id['port_model']
+        device['network_model'] = (nfp_constants.GBP_MODE
+                                   if mgmt_port_id['port_model'] ==
+                                   nfp_constants.GBP_PORT
+                                   else nfp_constants.NEUTRON_MODE)
         device['network_function_instance_id'] = network_function_instance['id']
         device['network_function_id'] = nf_id
         device.update({'service_type': self._get_service_type(

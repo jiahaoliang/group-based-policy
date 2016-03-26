@@ -1,3 +1,15 @@
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import mock
 from mock import patch
 import unittest
@@ -9,15 +21,22 @@ from gbpservice.nfp.orchestrator.drivers import (
 
 OPENSTACK_DRIVER_CLASS_PATH = ('gbpservice.nfp.orchestrator'
                                '.openstack.openstack_driver')
+NFP_GBP_NETWORK_DRIVER_CLASS_PATH = ('gbpservice.nfp.orchestrator'
+                                     '.coal.networking'
+                                     '.nfp_gbp_network_driver')
+NFP_NEUTRON_NETWORK_DRIVER_CLASS_PATH = ('gbpservice.nfp.orchestrator'
+                                         '.coal.networking'
+                                         '.nfp_neutron_network_driver')
 
 
 @patch(OPENSTACK_DRIVER_CLASS_PATH + '.KeystoneClient.__init__',
        mock.MagicMock(return_value=None))
 @patch(OPENSTACK_DRIVER_CLASS_PATH + '.NovaClient.__init__',
        mock.MagicMock(return_value=None))
-@patch(OPENSTACK_DRIVER_CLASS_PATH + '.GBPClient.__init__',
+@patch(NFP_GBP_NETWORK_DRIVER_CLASS_PATH + '.NFPGBPNetworkDriver.__init__',
        mock.MagicMock(return_value=None))
-@patch(OPENSTACK_DRIVER_CLASS_PATH + '.NeutronClient.__init__',
+@patch(NFP_NEUTRON_NETWORK_DRIVER_CLASS_PATH +
+       '.NFPNeutronNetworkDriver.__init__',
        mock.MagicMock(return_value=None))
 class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
 
@@ -87,6 +106,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                         supports_device_sharing=True,
                         supports_hotplug=True,
                         max_interfaces=10)
+        driver.network_handler = driver.network_handlers['gbp']
 
         # Monkey patch the methods
         driver.identity_handler.get_admin_token = mock.MagicMock(
@@ -95,27 +115,20 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                                                             return_value='8')
         driver.identity_handler.get_keystone_creds = mock.MagicMock(
                                     return_value=(None, None, 'admin', None))
-        driver.network_handler_gbp.create_policy_target = mock.MagicMock(
-                                                return_value={'id': '5'})
-        driver.network_handler_neutron.create_port = mock.MagicMock(
+        driver.network_handler.create_port = mock.MagicMock(
                                                 return_value={'id': '5'})
         driver.compute_handler_nova.get_image_id = mock.MagicMock(
                                                 return_value='6')
-        driver.network_handler_gbp.get_policy_target = mock.MagicMock(
-                                                return_value={'port_id': '7'})
         driver.compute_handler_nova.create_instance = mock.MagicMock(
                                                 return_value='8')
-        driver.network_handler_gbp.delete_policy_target = mock.MagicMock(
+        driver.network_handler.delete_port = mock.MagicMock(
                                                 return_value=None)
-        driver.network_handler_neutron.delete_port = mock.MagicMock(
-                                                return_value=None)
-        driver.network_handler_neutron.get_port = mock.MagicMock(
-                return_value={
-                    'port': {
-                        'fixed_ips': [{'ip_address': '0.0.0.0'}]
-                    }
-                })
-
+        driver.network_handler.get_port_id = mock.MagicMock(return_value='7')
+        driver.network_handler.get_port_details = mock.MagicMock(
+                                            return_value=('a.b.c.d',
+                                                          'aa:bb:cc:dd:ee:ff',
+                                                          'p.q.r.s/t',
+                                                          'w.x.y.z'))
         # test for create device when interface hotplug is enabled
         device_data = {'tenant_id': '1',
                        'network_model': 'gbp',
@@ -153,6 +166,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                         supports_device_sharing=True,
                         supports_hotplug=True,
                         max_interfaces=10)
+        driver.network_handler = driver.network_handlers['gbp']
 
         # Monkey patch the methods
         driver.identity_handler.get_admin_token = mock.MagicMock(
@@ -163,14 +177,12 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                                     return_value=(None, None, 'admin', None))
         driver.compute_handler_nova.delete_instance = mock.MagicMock(
                                                         return_value=None)
-        driver.network_handler_gbp.delete_policy_target = mock.MagicMock(
-                                                return_value=None)
-        driver.network_handler_neutron.delete_port = mock.MagicMock(
-                                                return_value=None)
+        driver.network_handler.delete_port = mock.MagicMock(return_value=None)
 
         device_data = {'id': '1',
                        'tenant_id': '2',
                        'compute_policy': 'xyz',
+                       'network_model': 'gbp',
                        'mgmt_port_id': {'id': '3',
                                         'port_model': 'gbp',
                                         'port_classification': 'mgmt'}}
@@ -216,6 +228,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                 supports_device_sharing=True,
                 supports_hotplug=False,
                 max_interfaces=10)
+        driver.network_handler = driver.network_handlers['gbp']
 
         # Monkey patch the methods
         driver.identity_handler.get_admin_token = mock.MagicMock(
@@ -224,12 +237,11 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                                                             return_value='8')
         driver.identity_handler.get_keystone_creds = mock.MagicMock(
                                     return_value=(None, None, 'admin', None))
-        driver.network_handler_neutron.update_port = mock.MagicMock(
+        driver.network_handler.set_promiscuos_mode = mock.MagicMock(
                                                         return_value=None)
         driver.compute_handler_nova.attach_interface = mock.MagicMock(
                                                         return_value=None)
-        driver.network_handler_gbp.get_policy_target = mock.MagicMock(
-                                                return_value={'port_id': '7'})
+        driver.network_handler.get_port_id = mock.MagicMock(return_value='7')
 
         self.assertRaises(Exception,
                           driver.plug_network_function_device_interfaces, None)
@@ -239,6 +251,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
         device_data = {'id': '1',
                        'tenant_id': '2',
                        'compute_policy': 'xyz',
+                       'network_model': 'gbp',
                        'ports': [{'id': '3',
                                   'port_model': 'gbp',
                                   'port_classification': 'provider'},
@@ -260,6 +273,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                 supports_device_sharing=True,
                 supports_hotplug=False,
                 max_interfaces=10)
+        driver.network_handler = driver.network_handlers['gbp']
 
         # Monkey patch the methods
         driver.identity_handler.get_admin_token = mock.MagicMock(
@@ -268,12 +282,9 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                                                             return_value='8')
         driver.identity_handler.get_keystone_creds = mock.MagicMock(
                                     return_value=(None, None, 'admin', None))
-        driver.network_handler_neutron.update_port = mock.MagicMock(
-                                                        return_value=None)
         driver.compute_handler_nova.detach_interface = mock.MagicMock(
                                                         return_value=None)
-        driver.network_handler_gbp.get_policy_target = mock.MagicMock(
-                                                return_value={'port_id': '7'})
+        driver.network_handler.get_port_id = mock.MagicMock(return_value='7')
 
         self.assertRaises(Exception,
                           driver.unplug_network_function_device_interfaces,
@@ -284,6 +295,7 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
         device_data = {'id': '1',
                        'tenant_id': '2',
                        'compute_policy': 'xyz',
+                       'network_model': 'gbp',
                        'ports': [{'id': '3',
                                   'port_model': 'gbp',
                                   'port_classification': 'provider'},
@@ -307,7 +319,8 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                 max_interfaces=10)
 
         device_data = {'id': '1',
-                       'mgmt_ip_address': 'a.b.c.d'}
+                       'mgmt_ip_address': 'a.b.c.d',
+                       'service_type': 'loadbalancer'}
 
         self.assertIsInstance(
             driver.get_network_function_device_healthcheck_info(device_data),
@@ -318,33 +331,25 @@ class HaproxyOrchestrationDriverTestCase(unittest.TestCase):
                 supports_device_sharing=True,
                 supports_hotplug=False,
                 max_interfaces=10)
+        driver.network_handler = driver.network_handlers['gbp']
 
         # Monkey patch the methods
         driver.identity_handler.get_admin_token = mock.MagicMock(
                                                         return_value='token')
-        driver.network_handler_gbp.get_policy_target = mock.MagicMock(
-                                                return_value={'port_id': '7'})
-        driver.network_handler_neutron.get_port = mock.MagicMock(
-                            return_value={'port': {
-                                            'mac_address': 'aa:bb:cc:dd:ee:ff',
-                                            'fixed_ips': [
-                                                {
-                                                    'ip_address': 'p.q.r.s',
-                                                    'subnet_id': '8'
-                                                }
-                                            ]
-                                        }})
-        driver.network_handler_neutron.get_subnet = mock.MagicMock(
-                            return_value={'subnet': {
-                                            'cidr': 'p.q.r.s/t',
-                                            'gateway_ip': 'p.q.r.1'
-                                        }})
+        driver.network_handler.get_port_details = mock.MagicMock(
+                                            return_value=('a.b.c.d',
+                                                          'aa:bb:cc:dd:ee:ff',
+                                                          'p.q.r.s/t',
+                                                          'w.x.y.z'))
 
         device_data = {'service_vendor': 'haproxy',
                        'mgmt_ip_address': 'a.b.c.d',
                        'ports': [{'id': '3',
                                   'port_model': 'gbp',
-                                  'port_classification': 'provider'}]}
+                                  'port_classification': 'provider'}],
+                       'service_type': 'loadbalancer',
+                       'network_function_id': '4',
+                       'tenant_id': '5'}
 
         reply = driver.get_network_function_device_config_info(device_data)
         self.assertIsInstance(reply, dict, msg='')
