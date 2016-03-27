@@ -33,7 +33,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         context_dict = context.to_dict()
         context_dict.update({'service_info': db})
         kwargs.update({'context': context_dict})
-        body = prepare_request_data(name, kwargs, "loadbalancer")
+        body = prepare_request_data(name, kwargs, "loadbalancerv2")
         send_request_to_configurator(self._conf, context, body, "CREATE")
 
     def _delete(self, context, tenant_id, name, **kwargs):
@@ -41,7 +41,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         context_dict = context.to_dict()
         context_dict.update({'service_info': db})
         kwargs.update({'context': context_dict})
-        body = prepare_request_data(name, kwargs, "loadbalancer")
+        body = prepare_request_data(name, kwargs, "loadbalancerv2")
         send_request_to_configurator(self._conf, context, body, "DELETE")
 
     def create_loadbalancer(self, context, loadbalancer, driver_name, allocate_vip=True):
