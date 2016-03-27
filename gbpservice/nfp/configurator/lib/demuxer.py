@@ -114,8 +114,10 @@ class ServiceAgentDemuxer(object):
                     method = operation + '_' + config_data['resource']
                 elif service_type == 'vpn':
                     method = 'vpnservice_updated'
-                elif service_type == 'loadbalancer':
+                elif service_type == 'loadbalancer' or service_type == 'loadbalancerv2':
                     method = operation + '_' + config_data['resource']
+                else:
+                    return None
             else:
                 sa_info.update({'service_type': 'generic'})
                 if operation == 'create':

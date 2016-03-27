@@ -142,7 +142,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'loadbalancer': loadbalancer,
                     'driver_name': driver_name
                     }
-        self._send_event(lb_constants.CREATE_LOADBALANCER, arg_dict,
+        self._send_event(lb_constants.EVENT_CREATE_LOADBALANCER, arg_dict,
                          serialize=True, binding_key=loadbalancer['id'],
                          key=loadbalancer['id'])
 
@@ -777,7 +777,7 @@ def register_service_agent(cm, sc, conf, rpcmgr):
 
     """
 
-    service_type = 'loadbalancer'  # lb_constants.SERVICE_TYPE
+    service_type = lb_constants.SERVICE_TYPE
     cm.register_service_agent(service_type, rpcmgr)
 
 
