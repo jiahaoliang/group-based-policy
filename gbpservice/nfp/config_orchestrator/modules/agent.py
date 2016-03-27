@@ -53,12 +53,12 @@ def rpc_init(sc, conf):
     )
 
     lbv2_report_state = {
-        'binary': 'oc-lb-agent',
+        'binary': 'oc-lb-agentv2',
         'host': cfg.CONF.host,
         'topic': a_topics.LBV2_NFP_CONFIGAGENT_TOPIC,
         'plugin_topic': a_topics.LBV2_NFP_PLUGIN_TOPIC,
-        'agent_type': 'NFP Loadbalancer agent',
-        'configurations': {'device_drivers': ['loadbalancer']},
+        'agent_type': 'NFP Loadbalancer V2 agent',
+        'configurations': {'device_drivers': ['loadbalancerv2']},
         'start_flag': True,
         'report_interval': conf.reportstate_interval
     }
