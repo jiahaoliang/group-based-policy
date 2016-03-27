@@ -44,10 +44,11 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         body = prepare_request_data(name, kwargs, "loadbalancerv2")
         send_request_to_configurator(self._conf, context, body, "DELETE")
 
+    #TODO: Argument allocate_vip and delete_vip_port are not implememnted.
     def create_loadbalancer(self, context, loadbalancer, driver_name, allocate_vip=True):
         self._post(
             context, loadbalancer['tenant_id'],
-            'loadbalancer', loadbalancer=loadbalancer)
+            'loadbalancer', loadbalancer=loadbalancer, driver_name=driver_name)
 
     def delete_loadbalancer(self, context, loadbalancer, delete_vip_port=True):
         self._delete(
