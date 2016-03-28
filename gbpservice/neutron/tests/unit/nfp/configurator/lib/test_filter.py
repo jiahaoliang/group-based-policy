@@ -183,4 +183,3 @@ class FilterTest(filter_base.BaseTestCase):
                                    }]}
 
         self.assertEqual(retval, [expected])
-
