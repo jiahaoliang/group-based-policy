@@ -44,15 +44,15 @@ class LoggingNoopCommonManager(object):
 
     @driver_base.driver_op
     def create(self, context, obj):
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj.id)
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
 
     @driver_base.driver_op
     def update(self, context, old_obj, obj):
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj.id)
+        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
 
     @driver_base.driver_op
     def delete(self, context, obj):
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj.id)
+        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
 
 
 class LoggingNoopLoadBalancerManager(LoggingNoopCommonManager,
@@ -65,18 +65,18 @@ class LoggingNoopLoadBalancerManager(LoggingNoopCommonManager,
 
     def create_and_allocate_vip(self, context, obj):
         LOG.info("LB %s no-op, create_and_allocate_vip %s",
-                  self.__class__.__name__, obj.id)
+                  self.__class__.__name__, obj['id'])
         self.create(context, obj)
 
     @driver_base.driver_op
     def refresh(self, context, obj):
         # This is intended to trigger the backend to check and repair
         # the state of this load balancer and all of its dependent objects
-        LOG.info("LB pool refresh %s", obj.id)
+        LOG.info("LB pool refresh %s", obj['id'])
 
     @driver_base.driver_op
     def stats(self, context, lb_obj):
-        LOG.info("LB stats %s", lb_obj.id)
+        LOG.info("LB stats %s", lb_obj['id'])
         return {
             "bytes_in": 0,
             "bytes_out": 0,

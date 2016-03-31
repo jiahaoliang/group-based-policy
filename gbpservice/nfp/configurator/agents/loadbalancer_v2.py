@@ -504,17 +504,17 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                         lb_constants.ERROR, context)
                     return
                 driver = self.drivers[driver_name]
-                driver.create_loadbalancer(loadbalancer, context)
+                driver.load_balancer.create(context, loadbalancer) 
                 LBaaSEventHandler.instance_mapping[loadbalancer['id']] \
                     = driver_name
             elif operation == 'update':
                 old_loadbalancer = data['old_loadbalancer']
                 driver = self._get_driver()  # loadbalancer['id'])
-                driver.update_loadbalancer(
-                    old_loadbalancer, loadbalancer, context)
+                driver.load_balancer.update(context, 
+                    old_loadbalancer, loadbalancer)
             elif operation == 'delete':
                 driver = self._get_driver()  # loadbalancer['id'])
-                driver.delete_loadbalancer(loadbalancer, context)
+                driver.load_balancer.delete(context, loadbalance)
                 del LBaaSEventHandler.instance_mapping[loadbalancer['id']]
                 return  # Don't update object status for delete operation
         except Exception:
@@ -547,12 +547,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
 
         try:
             if operation == 'create':
-                driver.create_listener(listener, context)
+                driver.listener.create(context, listener)
             elif operation == 'update':
                 old_listener = data['old_listener']
-                driver.update_listener(old_listener, listener, context)
+                driver.listener.update(context, old_listener, listener)
             elif operation == 'delete':
-                driver.delete_listener(listener, context)
+                driver.listener.delete(context, listener)
                 return  # Don't update object status for delete operation
         except Exception:
             if operation == 'delete':
@@ -581,12 +581,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
 
         try:
             if operation == 'create':
-                driver.create_pool(pool, context)
+                driver.pool.create(context, pool)
             elif operation == 'update':
                 old_pool = data['old_pool']
-                driver.update_pool(old_pool, pool, context)
+                driver.pool.update(context, old_pool, pool)
             elif operation == 'delete':
-                driver.delete_pool(pool, context)
+                driver.pool.delete(context, pool)
                 return  # Don't update object status for delete operation
         except Exception:
             if operation == 'delete':
@@ -614,13 +614,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         driver = self._get_driver()  # pool_member['pool_id'])
         try:
             if operation == 'create':
-                driver.create_pool_member(pool_member, context)
+                driver.member.create(context, pool_member)
             elif operation == 'update':
                 old_pool_member = data['old_pool_member']
-                driver.update_pool_member(
-                    old_pool_member, pool_member, context)
+                driver.member,update(context, old_pool_member, pool_member)
             elif operation == 'delete':
-                driver.delete_pool_member(pool_member, context)
+                driver.member.delete(context, pool_member)
                 return  # Don't update object status for delete operation
         except Exception:
             if operation == 'delete':
@@ -652,16 +651,13 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                     'monitor_id': health_monitor['id']}
         try:
             if operation == 'create':
-                driver.create_health_monitor(health_monitor, pool_id,
-                                                  context)
+                driver.health_monitor.create(context, health_monitor, pool_id)
             elif operation == 'update':
                 old_health_monitor = data['old_health_monitor']
-                driver.update_health_monitor(old_health_monitor,
-                                                  health_monitor, pool_id,
-                                                  context)
+                driver.health_monitor.update(context, old_health_monitor, 
+                                                  health_monitor, pool_id)
             elif operation == 'delete':
-                driver.delete_health_monitor(health_monitor, pool_id,
-                                                  context)
+                driver.health_monitor.delete(context, health_monitor, pool_id)
                 return  # Don't update object status for delete operation
         except Exception:
             if operation == 'delete':
