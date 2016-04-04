@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import sys
+import pdb
 from oslo_log import log as logging
 
 from neutron_lbaas.drivers import driver_base
@@ -27,15 +29,30 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.\
 from gbpservice.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import data_models
 
+from octavia.common import constants
 # Assume ochestrator already created this amphora
 # TODO: This part need to be removed once the ochestartor part is done
 AMP = o_data_models.Amphora(
     lb_network_ip = "10.0.134.4",
-    id = "121daa13-d64b-4aae-ba4c-6aa001971ed7"
+    id = "121daa13-d64b-4aae-ba4c-6aa001971ed7",
+    status = constants.ACTIVE,
+    compute_id = "a1931b26-5635-49b6-917e-4da8f622389e"
 )
 
 LOG = logging.getLogger(__name__)
 
+class ForkedPdb(pdb.Pdb):
+    """A Pdb subclass that may be used
+    from a forked multiprocessing child
+
+    """
+    def interaction(self, *args, **kwargs):
+        _stdin = sys.stdin
+        try:
+            sys.stdin = file('/dev/stdin')
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
 
 class HaproxyLoadBalancerDriver(driver_base.LoadBalancerBaseDriver):
     service_type = 'loadbalancerv2'
@@ -76,11 +93,12 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                                  driver_base.BaseLoadBalancerManager):
 
     def create(self, context, loadbalancer, amp=AMP):
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
+        ForkedPdb().set_trace()
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
         # plug network
         # plug vip
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
-
+        
         # Get vip_subnet
         for subnet_dict in context['service_info']['subnets']:
             if subnet_dict['id'] == loadbalancer_obj.vip_subnet_id:
@@ -98,25 +116,34 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
             raise  exceptions.IncompleteData(
                 "VIP port information is not found")
 
+        # Get vrrp_port
+        for port_dict in context['service_info']['ports']:
+            if port_dict['device_id'] == amp.compute_id:
+                for fix_ip in port_dict['fixed_ips']:
+                    if fix_ip['subnet_id']== loadbalancer_obj.vip_subnet_id:
+                        vrrp_port = n_data_models.Port.from_dict(port_dict)
+        if vrrp_port is None:
+            raise  exceptions.IncompleteData(
+                "VRRP port information is not found")
+
         amphorae_network_config = {}
 
-        # TODO: used vip port as vrrp port. Need to review later
         amphorae_network_config[amp.id] = data_models.AmphoraNetworkConfig(
             amphora=amp,
             vip_subnet=vip_subnet,
             vip_port=vip_port,
-            vrrp_port=vip_port
+            vrrp_port=vrrp_port
         )
 
-        self.amphora_driver.post_vip_plug(
-                loadbalancer, amphorae_network_config)
-        LOG.debug("Notfied amphora of vip plug")
+        self.driver.amphora_driver.post_vip_plug(
+                loadbalancer_obj, amphorae_network_config)
+        LOG.info("Notfied amphora of vip plug")
 
     def update(self, context, old_loadbalancer, loadbalancer):
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, update %s", self.__class__.__name__, loadbalancer['id'])
 
     def delete(self, context, loadbalancer):
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, loadbalancer['id'])
 
     @property
     def allocates_vip(self):

@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import octavia.common.models as models
+import octavia.common.data_models as models
 
 
 # Amphorae Data Models
