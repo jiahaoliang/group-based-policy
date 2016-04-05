@@ -246,9 +246,11 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'pool': pool
                     }
         # TODO: M:N pool is not yet implemented.
+        # For Mitaka, use binding_key=pool['listeners'][0]['id']
+        # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_CREATE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listeners'][0]['id'],
+                         binding_key=pool['listener']['id'],
                          key=pool['id'])
 
     def update_pool(self, context, old_pool, pool):
@@ -265,9 +267,11 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'old_pool': old_pool,
                     'pool': pool,
                     }
+        # For Mitaka, use binding_key=pool['listeners'][0]['id']
+        # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_UPDATE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listeners'][0]['id'],
+                         binding_key=pool['listener']['id'],
                          key=pool['id'])
 
     def delete_pool(self, context, pool):
@@ -282,9 +286,11 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
         arg_dict = {'context': context,
                     'pool': pool,
                     }
+        # For Mitaka, use binding_key=pool['listeners'][0]['id']
+        # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_DELETE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listeners'][0]['id'],
+                         binding_key=pool['listener']['id'],
                          key=pool['id'])
 
     def create_pool_member(self, context, pool_member):
@@ -617,7 +623,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 driver.member.create(context, pool_member)
             elif operation == 'update':
                 old_pool_member = data['old_pool_member']
-                driver.member,update(context, old_pool_member, pool_member)
+                driver.member.update(context, old_pool_member, pool_member)
             elif operation == 'delete':
                 driver.member.delete(context, pool_member)
                 return  # Don't update object status for delete operation
