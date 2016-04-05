@@ -16,6 +16,7 @@
 import functools
 import hashlib
 import time
+import warnings
 
 from oslo_log import log as logging
 import requests
@@ -35,13 +36,6 @@ from oslo_config import cfg
 LOG = logging.getLogger(__name__)
 
 haproxy_amphora_opts = [
-    cfg.StrOpt('username',
-               default='ubuntu',
-               help=_('Name of user for access to amphora.')),
-    cfg.StrOpt('key_path',
-               default='/opt/stack/.ssh/id_rsa',
-               help=_('Local absolute path to the private key '
-                      'loaded on amphora at boot.')),
     cfg.StrOpt('base_path',
                default='/var/lib/octavia',
                help=_('Base directory for amphora files.')),
@@ -54,26 +48,36 @@ haproxy_amphora_opts = [
                help=_('Retry threshold for connecting to amphorae.')),
     cfg.IntOpt('connection_retry_interval',
                default=5,
-               help=_('Retry timeout between attempts in seconds.')),
+               help=_('Retry timeout between connection attempts in '
+                      'seconds.')),
+    cfg.StrOpt('haproxy_stick_size', default='10k',
+               help=_('Size of the HAProxy stick table. Accepts k, m, g '
+                      'suffixes.  Example: 10k')),
 
     # REST server
-    cfg.StrOpt('bind_host', default='0.0.0.0',
-               help=_("The host IP to bind to")),
-    cfg.IntOpt('bind_port', default=9443,
-               help=_("The port to bind to")),
+    cfg.IPOpt('bind_host', default='0.0.0.0',
+              help=_("The host IP to bind to")),
+    cfg.PortOpt('bind_port', default=9443,
+                help=_("The port to bind to")),
     cfg.StrOpt('haproxy_cmd', default='/usr/sbin/haproxy',
                help=_("The full path to haproxy")),
     cfg.IntOpt('respawn_count', default=2,
                help=_("The respawn count for haproxy's upstart script")),
     cfg.IntOpt('respawn_interval', default=2,
                help=_("The respawn interval for haproxy's upstart script")),
-    cfg.StrOpt('haproxy_cert_dir', default='/tmp/',
-               help=_("The directory to store haproxy cert files in")),
+    cfg.FloatOpt('rest_request_conn_timeout', default=10,
+                 help=_("The time in seconds to wait for a REST API "
+                        "to connect.")),
+    cfg.FloatOpt('rest_request_read_timeout', default=60,
+                 help=_("The time in seconds to wait for a REST API "
+                        "response.")),
     # REST client
     cfg.StrOpt('client_cert', default='/etc/octavia/certs/client.pem',
                help=_("The client certificate to talk to the agent")),
     cfg.StrOpt('server_ca', default='/etc/octavia/certs/server_ca.pem',
                help=_("The ca which signed the server certificates")),
+    cfg.BoolOpt('use_upstart', default=True,
+                help=_("If False, use sysvinit.")),
 ]
 
 certificate_opts = [
@@ -96,6 +100,7 @@ OCTAVIA_API_CLIENT = (
 
 
 class HaproxyAmphoraLoadBalancerDriver(driver_base.AmphoraLoadBalancerDriver):
+
     def __init__(self):
         super(HaproxyAmphoraLoadBalancerDriver, self).__init__()
         self.client = AmphoraAPIClient()
@@ -116,7 +121,6 @@ class HaproxyAmphoraLoadBalancerDriver(driver_base.AmphoraLoadBalancerDriver):
 
         # Process listener certificate info
         certs = self._process_tls_certificates(listener)
-
         # Generate HaProxy configuration from listener object
         config = self.jinja.build_config(listener, certs['tls_cert'],
                                          certs['sni_certs'])
@@ -133,6 +137,12 @@ class HaproxyAmphoraLoadBalancerDriver(driver_base.AmphoraLoadBalancerDriver):
                     self.client.reload_listener(amp, listener.id)
                 else:
                     self.client.start_listener(amp, listener.id)
+
+    def upload_cert_amp(self, amp, pem):
+        LOG.debug("Amphora %s updating cert in REST driver "
+                  "with amphora id %s,",
+                  self.__class__.__name__, amp.id)
+        self.client.update_cert_for_rotation(amp, pem)
 
     def _apply(self, func, listener=None, *args):
         for amp in listener.load_balancer.amphorae:
@@ -158,8 +168,7 @@ class HaproxyAmphoraLoadBalancerDriver(driver_base.AmphoraLoadBalancerDriver):
         pass
 
     def post_vip_plug(self, load_balancer, amphorae_network_config):
-        for id in amphorae_network_config.iterkeys():
-            amp = amphorae_network_config.get(id).amphora
+        for amp in load_balancer.amphorae:
             if amp.status != constants.DELETED:
                 subnet = amphorae_network_config.get(amp.id).vip_subnet
                 # NOTE(blogan): using the vrrp port here because that
@@ -173,12 +182,15 @@ class HaproxyAmphoraLoadBalancerDriver(driver_base.AmphoraLoadBalancerDriver):
                             'gateway': subnet.gateway_ip,
                             'mac_address': port.mac_address}
                 self.client.plug_vip(amp,
-                                     load_balancer.vip_address,
+                                     load_balancer.vip.ip_address,
                                      net_info)
 
     def post_network_plug(self, amphora, port):
         port_info = {'mac_address': port.mac_address}
         self.client.plug_network(amphora, port_info)
+
+    def get_vrrp_interface(self, amphora):
+        return self.client.get_interface(amphora, amphora.vrrp_ip)['interface']
 
     def _process_tls_certificates(self, listener):
         """Processes TLS data from the listener.
@@ -242,10 +254,14 @@ class AmphoraAPIClient(object):
         self.stop_listener = functools.partial(self._action, 'stop')
         self.reload_listener = functools.partial(self._action, 'reload')
 
+        self.start_vrrp = functools.partial(self._vrrp_action, 'start')
+        self.stop_vrrp = functools.partial(self._vrrp_action, 'stop')
+        self.reload_vrrp = functools.partial(self._vrrp_action, 'reload')
+
         self.session = requests.Session()
-        #self.session.cert = CONF.haproxy_amphora.client_cert
-        #self.ssl_adapter = CustomHostNameCheckingAdapter()
-        #self.session.mount('https://', self.ssl_adapter)
+        # self.session.cert = CONF.haproxy_amphora.client_cert
+        # self.ssl_adapter = CustomHostNameCheckingAdapter()
+        # self.session.mount('https://', self.ssl_adapter)
 
     def _base_url(self, ip):
         return "http://{ip}:{port}/{version}/".format(
@@ -254,24 +270,27 @@ class AmphoraAPIClient(object):
             version=API_VERSION)
 
     def request(self, method, amp, path='/', **kwargs):
-        LOG.debug("request url " + path)
+        LOG.debug("request url %s", path)
         _request = getattr(self.session, method.lower())
         _url = self._base_url(amp.lb_network_ip) + path
-
+        LOG.debug("request url " + _url)
+        timeout_tuple = (CONF.haproxy_amphora.rest_request_conn_timeout,
+                         CONF.haproxy_amphora.rest_request_read_timeout)
         reqargs = {
-        #    'verify': CONF.haproxy_amphora.server_ca,
-            'url': _url }
+            # 'verify': CONF.haproxy_amphora.server_ca,
+            'url': _url,
+            'timeout': timeout_tuple, }
         reqargs.update(kwargs)
         headers = reqargs.setdefault('headers', {})
 
         headers['User-Agent'] = OCTAVIA_API_CLIENT
-        #self.ssl_adapter.uuid = amp.id
+        # self.ssl_adapter.uuid = amp.id
         # Keep retrying
         for a in six.moves.xrange(CONF.haproxy_amphora.connection_max_retries):
             try:
                 r = _request(**reqargs)
-            except requests.ConnectionError:
-                LOG.warn(_LW("Could not talk  to instance"))
+            except (requests.ConnectionError, requests.Timeout):
+                LOG.warning(_LW("Could not connect to instance. Retrying."))
                 time.sleep(CONF.haproxy_amphora.connection_retry_interval)
                 if a >= CONF.haproxy_amphora.connection_max_retries:
                     raise driver_except.TimeOutException()
@@ -282,7 +301,8 @@ class AmphoraAPIClient(object):
     def upload_config(self, amp, listener_id, config):
         r = self.put(
             amp,
-            'listeners/{listener_id}/haproxy'.format(listener_id=listener_id),
+            'listeners/{amphora_id}/{listener_id}/haproxy'.format(
+                amphora_id=amp.id, listener_id=listener_id),
             data=config)
         return exc.check_exception(r)
 
@@ -304,6 +324,10 @@ class AmphoraAPIClient(object):
             'listeners/{listener_id}/certificates/{filename}'.format(
                 listener_id=listener_id, filename=pem_filename),
             data=pem_file)
+        return exc.check_exception(r)
+
+    def update_cert_for_rotation(self, amp, pem_file):
+        r = self.put(amp, 'certificate', data=pem_file)
         return exc.check_exception(r)
 
     def get_cert_md5sum(self, amp, listener_id, pem_filename):
@@ -351,4 +375,15 @@ class AmphoraAPIClient(object):
                       json=net_info)
         return exc.check_exception(r)
 
+    def upload_vrrp_config(self, amp, config):
+        r = self.put(amp, 'vrrp/upload', data=config)
+        return exc.check_exception(r)
 
+    def _vrrp_action(self, action, amp):
+        r = self.put(amp, 'vrrp/{action}'.format(action=action))
+        return exc.check_exception(r)
+
+    def get_interface(self, amp, ip_addr):
+        r = self.get(amp, 'interface/{ip_addr}'.format(ip_addr=ip_addr))
+        if exc.check_exception(r):
+            return r.json()

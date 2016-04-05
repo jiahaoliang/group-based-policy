@@ -14,6 +14,7 @@
 
 import sys
 import pdb
+import copy
 from oslo_log import log as logging
 
 from neutron_lbaas.drivers import driver_base as n_driver_base
@@ -66,73 +67,102 @@ class OctaviaDataModelBuilder(object):
         self.driver = driver
 
     # All Octavia data models have these attributes
-    def _get_common_args(self, dict):
+    def _get_common_args(self, obj):
         return {
-            'id': dict['id'],
-            'project_id': dict['tenant_id'],
-            'name': dict['name'],
-            'description': dict['description'],
-            'enabled': dict['admin_state_up']
+            'id': obj.id,
+            'project_id': obj.tenant_id,
+            'name': obj.name,
+            'description': obj.description,
+            'enabled': obj.admin_state_up,
+            'provisioning_status': obj.provisioning_status,
+            'operating_status': obj.operating_status,
         }
+
+    # Update Octavia model from dict
+    def _update(self, octavia_data_model, update_dict):
+        for key, value in update_dict.items():
+            setattr(octavia_data_model, key, value)
+        return octavia_data_model
 
     # Translate loadbalancer neutron model dict to octavia model
     def get_loadbalancer_octavia_model(self, loadbalancer_dict):
+        loadbalancer = n_data_models.LoadBalancer.from_dict(
+            copy.deepcopy(loadbalancer_dict))
         ret = o_data_models.LoadBalancer()
-        args = self._get_common_args(loadbalancer_dict)
+        args = self._get_common_args(loadbalancer)
         vip = o_data_models.Vip(
-            load_balancer_id=loadbalancer_dict['id'],
-            ip_address=loadbalancer_dict['vip_address'],
-            subnet_id=loadbalancer_dict['vip_subnet_id'],
-            port_id=loadbalancer_dict['vip_port.id'],
+            load_balancer_id=loadbalancer.id,
+            ip_address=loadbalancer.vip_address,
+            subnet_id=loadbalancer.vip_subnet_id,
+            port_id=loadbalancer.vip_port.id,
             load_balancer=ret
         )
         amphorae = self.driver.get_amphora(loadbalancer.id)
         # TODO: vrrp_group, topology, server_group_id are not included yet
-        args.update(
-            vip=vip,
-            amphorae=amphorae
-        )
-        ret.update(args)
+        args.update({
+            'vip': vip,
+            'amphorae': amphorae
+        })
+        if loadbalancer_dict['listeners'] is not None:
+            listeners = []
+            for listener_dict in loadbalancer_dict['listeners']:
+                listeners.append(
+                    self.get_listener_octavia_model(listener_dict)
+                )
+            args.update({
+                'listeners': listeners,
+            })
+
+        ret = self._update(ret, args)
         return ret
 
     # Translate listener neutron model dict to octavia model
     def get_listener_octavia_model(self,listener_dict):
-        args = self._get_common_args(listener_dict)
-        sni_container_ids = [tls_container_id
-                             for tls_container_id
-                             in listener_dict['sni_container_refs']]
-        sni_containers = [{'listener_id': listener_dict['id'],
-                           'tls_container_id': tls_container_id}
-                          for tls_container_id in sni_container_ids]
+        # Must use a copy because from_dict will modify the original dict
+        listener = n_data_models.Listener.from_dict(
+            copy.deepcopy(listener_dict))
+        ret = o_data_models.Listener()
+        args = self._get_common_args(listener)
+        sni_containers = []
+        sni_containers.extend(
+            o_data_models.SNI.from_dict(sni_dict)
+            for sni_dict in listener_dict['sni_containers']
+        )
+        if listener_dict['loadbalancer'] is not None:
+            loadbalancer = self.get_loadbalancer_octavia_model(
+                listener_dict['loadbalancer'])
+            args.update({
+                'load_balancer': loadbalancer,
+            })
         args.update({
-            'load_balancer_id': listener_dict['loadbalancer']['id'],
-            'protocol': listener_dict['protocol'],
-            'protocol_port': listener_dict['protocol_port'],
-            'connection_limit': listener_dict['connection_limit'],
-            'default_pool_id': listener_dict['default_pool_id'],
-            'tls_certificate_id': listener_dict['default_tls_container_ref'],
+            'load_balancer_id': listener.loadbalancer_id,
+            'protocol': listener.protocol,
+            'protocol_port': listener.protocol_port,
+            'connection_limit': listener.connection_limit,
+            'default_pool_id': listener.default_pool_id,
+            'tls_certificate_id': listener.default_tls_container_id,
             'sni_containers': sni_containers,
             'provisioning_status': constants.PENDING_CREATE,
-            'operating_status': constants.OFFLINE
+            'operating_status': constants.OFFLINE,
         })
-        ret = o_data_models.Listener.from_dict(args)
+        ret = self._update(ret, args)
         return ret
 
-    def associate_listerner_loadbalancer(self, context, listener_o_obj):
-        if listener_o_obj.load_balancer_id is not None:
-            for dict in context['service_info']['loadbalancers']:
-                if dict['id'] == listener_o_obj.load_balancer_id:
-                    lb_dict = dict
-                    break
-            if lb_dict is not None:
-                lb = self.get_loadbalancer_octavia_model(lb_dict)
-            if lb_dict is None or lb is None:
-                raise exceptions.IncompleteData(
-                    "Loadbalancer information is not found")
-            lb.listeners.append(listener_o_obj)
-            lb.pools = listener_o_obj.pools
-            listener_o_obj.load_balancer = lb
-        return listener_o_obj
+    # def associate_listerner_loadbalancer(self, context, listener_o_obj):
+    #     if listener_o_obj.load_balancer_id is not None:
+    #         for dict in context['service_info']['loadbalancers']:
+    #             if dict['id'] == listener_o_obj.load_balancer_id:
+    #                 lb_dict = dict
+    #                 break
+    #         if lb_dict is not None:
+    #             lb = self.get_loadbalancer_octavia_model(lb_dict)
+    #         if lb_dict is None or lb is None:
+    #             raise exceptions.IncompleteData(
+    #                 "Loadbalancer information is not found")
+    #         lb.listeners.append(listener_o_obj)
+    #         lb.pools = listener_o_obj.pools
+    #         listener_o_obj.load_balancer = lb
+    #     return listener_o_obj
 
 
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
@@ -184,7 +214,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         # plug network
         # plug vip
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
-        
+
         # Get vip_subnet
         for subnet_dict in context['service_info']['subnets']:
             if subnet_dict['id'] == loadbalancer_obj.vip_subnet_id:
@@ -269,8 +299,6 @@ class HaproxyListenerManager(HaproxyCommonManager,
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, listener['id'])
         listener_o_obj = self.driver.o_models_builder.\
             get_listener_octavia_model(listener)
-        self.driver.o_models_builder.\
-            associate_listerner_loadbalancer(context, listener_o_obj)
         self.driver.amphora_driver.update(listener_o_obj,
                                           listener_o_obj.load_balancer.vip)
 
