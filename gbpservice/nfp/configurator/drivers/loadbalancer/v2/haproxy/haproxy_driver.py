@@ -31,7 +31,7 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import data_models
 
 from octavia.common import constants
-# Assume ochestrator already created this amphora
+# Assume orchestrator already created this amphora
 # TODO: This part need to be removed once the ochestartor part is done
 AMP = o_data_models.Amphora(
     lb_network_ip = "10.0.134.4",
@@ -41,6 +41,7 @@ AMP = o_data_models.Amphora(
 )
 
 LOG = logging.getLogger(__name__)
+
 
 class ForkedPdb(pdb.Pdb):
     """A Pdb subclass that may be used
@@ -54,6 +55,85 @@ class ForkedPdb(pdb.Pdb):
             pdb.Pdb.interaction(self, *args, **kwargs)
         finally:
             sys.stdin = _stdin
+
+
+# As we use the rest client and amphora image from Octavia,
+# we need to have a helper class to simulate Octavia DB operation
+# in order to get Octavia data models from Neutron-lbaas data models
+class OctaviaDataModelBuilder(object):
+
+    def __init__(self, driver=None):
+        self.driver = driver
+
+    # All Octavia data models have these attributes
+    def _get_common_args(self, dict):
+        return {
+            'id': dict['id'],
+            'project_id': dict['tenant_id'],
+            'name': dict['name'],
+            'description': dict['description'],
+            'enabled': dict['admin_state_up']
+        }
+
+    # Translate loadbalancer neutron model dict to octavia model
+    def get_loadbalancer_octavia_model(self, loadbalancer_dict):
+        ret = o_data_models.LoadBalancer()
+        args = self._get_common_args(loadbalancer_dict)
+        vip = o_data_models.Vip(
+            load_balancer_id=loadbalancer_dict['id'],
+            ip_address=loadbalancer_dict['vip_address'],
+            subnet_id=loadbalancer_dict['vip_subnet_id'],
+            port_id=loadbalancer_dict['vip_port.id'],
+            load_balancer=ret
+        )
+        amphorae = self.driver.get_amphora(loadbalancer.id)
+        # TODO: vrrp_group, topology, server_group_id are not included yet
+        args.update(
+            vip=vip,
+            amphorae=amphorae
+        )
+        ret.update(args)
+        return ret
+
+    # Translate listener neutron model dict to octavia model
+    def get_listener_octavia_model(self,listener_dict):
+        args = self._get_common_args(listener_dict)
+        sni_container_ids = [tls_container_id
+                             for tls_container_id
+                             in listener_dict['sni_container_refs']]
+        sni_containers = [{'listener_id': listener_dict['id'],
+                           'tls_container_id': tls_container_id}
+                          for tls_container_id in sni_container_ids]
+        args.update({
+            'load_balancer_id': listener_dict['loadbalancer']['id'],
+            'protocol': listener_dict['protocol'],
+            'protocol_port': listener_dict['protocol_port'],
+            'connection_limit': listener_dict['connection_limit'],
+            'default_pool_id': listener_dict['default_pool_id'],
+            'tls_certificate_id': listener_dict['default_tls_container_ref'],
+            'sni_containers': sni_containers,
+            'provisioning_status': constants.PENDING_CREATE,
+            'operating_status': constants.OFFLINE
+        })
+        ret = o_data_models.Listener.from_dict(args)
+        return ret
+
+    def associate_listerner_loadbalancer(self, context, listener_o_obj):
+        if listener_o_obj.load_balancer_id is not None:
+            for dict in context['service_info']['loadbalancers']:
+                if dict['id'] == listener_o_obj.load_balancer_id:
+                    lb_dict = dict
+                    break
+            if lb_dict is not None:
+                lb = self.get_loadbalancer_octavia_model(lb_dict)
+            if lb_dict is None or lb is None:
+                raise exceptions.IncompleteData(
+                    "Loadbalancer information is not found")
+            lb.listeners.append(listener_o_obj)
+            lb.pools = listener_o_obj.pools
+            listener_o_obj.load_balancer = lb
+        return listener_o_obj
+
 
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
@@ -77,85 +157,11 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
         self.pool = HaproxyPoolManager(self)
         self.member = HaproxyMemberManager(self)
         self.health_monitor = HaproxyHealthMonitorManager(self)
+        self.o_models_builder = OctaviaDataModelBuilder(self)
 
     # Get Amphora object given the loadbalancer_id
-    def _get_amphora(self, loadbalancer_id):
+    def get_amphora(self, loadbalancer_id):
         return [AMP]
-
-    # Helper used in *neutron_model_to_octavia_model
-    def _get_common_args(self, obj):
-        return {
-            'id': obj.id,
-            'project_id': obj.tenant_id,
-            'name': obj.name,
-            'description': obj.description,
-            'enabled': obj.admin_state_up,
-            'provisioning_status': obj.provisioning_status,
-            'operating_status': obj.operating_status
-        }
-
-    # Translate loadbalancer neutron model dict to octavia model
-    def _get_loadbalancer_octavia_model(self, loadbalancer_dict):
-        loadbalancer = n_data_models.Loadbalancer.from_dict(loadbalancer_dict)
-        ret = o_data_models.LoadBalancer()
-        args = self._get_common_args(loadbalancer)
-        vip = o_data_models.Vip(
-            load_balancer_id=loadbalancer.id,
-            ip_address=loadbalancer.vip_address,
-            subnet_id=loadbalancer.vip_subnet_id,
-            port_id=loadbalancer.vip_port.id,
-            load_balancer=ret
-        )
-        amphorae = self._get_amphora(loadbalancer.id)
-        #TODO: vrrp_group, topology, server_group_id are not included yet
-        args.update(
-            vip=vip,
-            amphorae=amphorae
-        )
-        ret.update(args)
-        return ret
-
-    # Translate listener neutron model dict to octavia model
-    def _get_listener_octavia_model(self,listener_dict):
-        listener = n_data_models.Listener.from_dict(listener_dict)
-        args = self._get_common_args(listener)
-        sni_container_ids = [sni.tls_container_id
-                             for sni in listener.sni_containers]
-        sni_containers = [{'listener_id': listener.id,
-                           'tls_container_id': sni_container_id}
-                          for sni_container_id in sni_container_ids]
-        args.update({
-            'load_balancer_id': listener.loadbalancer_id,
-            'protocol': listener.protocol,
-            'protocol_port': listener.protocol_port,
-            'connection_limit': listener.connection_limit,
-            'default_pool_id': listener.default_pool_id,
-            'tls_certificate_id': listener.default_tls_container_id,
-            'sni_containers_ids': sni_container_ids,
-            'sni_containers': sni_containers,
-            'provisioning_status': constants.PENDING_CREATE,
-            'operating_status': constants.OFFLINE
-        })
-        ret = o_data_models.Listener.from_dict(args)
-
-    def _associate_listerner_loadbalancer(self, context, listener_o_obj):
-        if listener_o_obj.load_balancer_id is not None:
-            lb_dict = next(
-                (dict for lb_dicts
-                in context['service_info']['loadbalancers']
-                if (dict.id == listener_o_obj.load_balancer_id)),
-                None
-            )
-            if lb_dict is not None:
-                lb = self._get_loadbalancer_octavia_model(lb_dict)
-            if lb_dict is None or lb is None:
-                raise  exceptions.IncompleteData(
-                    "Loadbalancer information is not found")
-            lb.listeners.append(listener_o_obj)
-            lb.pools = listener_o_obj.pools
-            listener_o_obj.load_balancer = lb
-
-
 
 class HaproxyCommonManager(object):
 
@@ -170,7 +176,7 @@ class HaproxyCommonManager(object):
 
 
 class HaproxyLoadBalancerManager(HaproxyCommonManager,
-                                 driver_base.BaseLoadBalancerManager):
+                                 n_driver_base.BaseLoadBalancerManager):
 
     def create(self, context, loadbalancer, amp=AMP):
         ForkedPdb().set_trace()
@@ -237,7 +243,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
     def create_and_allocate_vip(self, context, obj):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create_and_allocate_vip %s",
-                  self.__class__.__name__, obj['id'])
+                 self.__class__.__name__, obj['id'])
         self.create(context, obj)
 
     def refresh(self, context, obj):
@@ -256,17 +262,15 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
 
 
 class HaproxyListenerManager(HaproxyCommonManager,
-                             driver_base.BaseListenerManager):
-
-
-
-
+                             n_driver_base.BaseListenerManager):
 
     def create(self, context, listener):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, listener['id'])
-        listener_o_obj = self._get_listener_octavia_model(listener)
-        self._associate_listerner_loadbalancer(context, listener_o_obj)
+        listener_o_obj = self.driver.o_models_builder.\
+            get_listener_octavia_model(listener)
+        self.driver.o_models_builder.\
+            associate_listerner_loadbalancer(context, listener_o_obj)
         self.driver.amphora_driver.update(listener_o_obj,
                                           listener_o_obj.load_balancer.vip)
 
@@ -280,7 +284,7 @@ class HaproxyListenerManager(HaproxyCommonManager,
 
 
 class HaproxyPoolManager(HaproxyCommonManager,
-                         driver_base.BasePoolManager):
+                         n_driver_base.BasePoolManager):
 
     def create(self, context, obj):
         ForkedPdb().set_trace()
@@ -296,7 +300,7 @@ class HaproxyPoolManager(HaproxyCommonManager,
 
 
 class HaproxyMemberManager(HaproxyCommonManager,
-                           driver_base.BaseMemberManager):
+                           n_driver_base.BaseMemberManager):
 
     def create(self, context, obj):
         ForkedPdb().set_trace()
@@ -312,7 +316,7 @@ class HaproxyMemberManager(HaproxyCommonManager,
 
 
 class HaproxyHealthMonitorManager(HaproxyCommonManager,
-                                  driver_base.BaseHealthMonitorManager):
+                                  n_driver_base.BaseHealthMonitorManager):
 
     def create(self, context, obj):
         ForkedPdb().set_trace()
