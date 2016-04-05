@@ -514,7 +514,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                     old_loadbalancer, loadbalancer)
             elif operation == 'delete':
                 driver = self._get_driver()  # loadbalancer['id'])
-                driver.load_balancer.delete(context, loadbalance)
+                driver.load_balancer.delete(context, loadbalancer)
                 del LBaaSEventHandler.instance_mapping[loadbalancer['id']]
                 return  # Don't update object status for delete operation
         except Exception:

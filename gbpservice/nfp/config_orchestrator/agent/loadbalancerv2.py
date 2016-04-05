@@ -10,6 +10,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron_lbaas.agent import agent_api
+from neutron_lbaas.services.loadbalancer import constants as lb_const
 from neutron_lbaas.db.loadbalancer import loadbalancer_dbv2
 from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
 from gbpservice.nfp.config_orchestrator.agent.common import *
@@ -27,6 +29,12 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         self._conf = conf
         self._sc = sc
         super(Lbv2Agent, self).__init__()
+        # TODO: Currently mark every operations successfull anyway
+        self.plugin_rpc = agent_api.LbaasAgentApi(
+            lb_const.LOADBALANCER_PLUGINV2,
+            self.context,
+            self.conf.host
+        )
 
     def _post(self, context, tenant_id, name, **kwargs):
         db = self._context(context, tenant_id)
@@ -35,6 +43,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         kwargs.update({'context': context_dict})
         body = prepare_request_data(name, kwargs, "loadbalancerv2")
         send_request_to_configurator(self._conf, context, body, "CREATE")
+        self.plugin_rpc.update_status(name, kwargs[name]["id"],
+                                      provisioning_status="ACTIVE",
+                                      operating_status="ONLINE")
 
     def _delete(self, context, tenant_id, name, **kwargs):
         db = self._context(context, tenant_id)
