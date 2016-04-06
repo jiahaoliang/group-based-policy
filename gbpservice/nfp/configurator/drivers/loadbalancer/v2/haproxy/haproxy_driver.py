@@ -74,7 +74,6 @@ class OctaviaDataModelBuilder(object):
             'name': obj.name,
             'description': obj.description,
             'enabled': obj.admin_state_up,
-            'provisioning_status': obj.provisioning_status,
             'operating_status': obj.operating_status,
         }
 
@@ -101,23 +100,30 @@ class OctaviaDataModelBuilder(object):
         # TODO: vrrp_group, topology, server_group_id are not included yet
         args.update({
             'vip': vip,
-            'amphorae': amphorae
+            'amphorae': amphorae,
+            'provisioning_status': loadbalancer.provisioning_status,
         })
-        if loadbalancer_dict['listeners'] is not None:
+        if loadbalancer_dict.get('listeners'):
             listeners = []
+            pools = []
             for listener_dict in loadbalancer_dict['listeners']:
-                listeners.append(
-                    self.get_listener_octavia_model(listener_dict)
-                )
+                listener = self.get_listener_octavia_model(listener_dict)
+                listener.load_balancer = ret
+                listeners.append(listener)
+                pools.extend(listener.pools)
+                for pool in listener.pools:
+                    if pool.id not in [pool.id for pool in pools]:
+                        pools.append(pool)
             args.update({
                 'listeners': listeners,
+                'pools': pools,
             })
 
         ret = self._update(ret, args)
         return ret
 
     # Translate listener neutron model dict to octavia model
-    def get_listener_octavia_model(self,listener_dict):
+    def get_listener_octavia_model(self, listener_dict):
         # Must use a copy because from_dict will modify the original dict
         listener = n_data_models.Listener.from_dict(
             copy.deepcopy(listener_dict))
@@ -128,11 +134,26 @@ class OctaviaDataModelBuilder(object):
             o_data_models.SNI.from_dict(sni_dict)
             for sni_dict in listener_dict['sni_containers']
         )
-        if listener_dict['loadbalancer'] is not None:
+        if listener_dict.get('loadbalancer'):
             loadbalancer = self.get_loadbalancer_octavia_model(
                 listener_dict['loadbalancer'])
+            if listener.id not in [_listener.id for _listener
+                                   in loadbalancer.listeners]:
+                loadbalancer.listeners.append(ret)
             args.update({
                 'load_balancer': loadbalancer,
+            })
+        if listener_dict.get('default_pool'):
+            pool = self.get_pool_octavia_model(
+                listener_dict['default_pool'])
+            if listener.id not in [_listener.id for _listener
+                                   in pool.listeners]:
+                pool.listeners.append(ret)
+            # TODO: In Mitaka, we need to handle multiple pools
+            pools = [pool]
+            args.update({
+                'default_pool': pool,
+                'pools': pools,
             })
         args.update({
             'load_balancer_id': listener.loadbalancer_id,
@@ -142,27 +163,87 @@ class OctaviaDataModelBuilder(object):
             'default_pool_id': listener.default_pool_id,
             'tls_certificate_id': listener.default_tls_container_id,
             'sni_containers': sni_containers,
-            'provisioning_status': constants.PENDING_CREATE,
-            'operating_status': constants.OFFLINE,
+            'provisioning_status': listener.provisioning_status,
         })
         ret = self._update(ret, args)
         return ret
 
-    # def associate_listerner_loadbalancer(self, context, listener_o_obj):
-    #     if listener_o_obj.load_balancer_id is not None:
-    #         for dict in context['service_info']['loadbalancers']:
-    #             if dict['id'] == listener_o_obj.load_balancer_id:
-    #                 lb_dict = dict
-    #                 break
-    #         if lb_dict is not None:
-    #             lb = self.get_loadbalancer_octavia_model(lb_dict)
-    #         if lb_dict is None or lb is None:
-    #             raise exceptions.IncompleteData(
-    #                 "Loadbalancer information is not found")
-    #         lb.listeners.append(listener_o_obj)
-    #         lb.pools = listener_o_obj.pools
-    #         listener_o_obj.load_balancer = lb
-    #     return listener_o_obj
+    # Translate pool neutron model dict to octavia model
+    def get_pool_octavia_model(self, pool_dict):
+        pool = n_data_models.Pool.from_dict(
+            copy.deepcopy(pool_dict)
+        )
+        ret = o_data_models.Pool()
+        args = self._get_common_args(pool)
+        # TODO: In Mitaka, instead of pool.listener,
+        # there are pool.listeners. We need to handle that
+        if pool_dict.get('listener'):
+            listener = self.get_listener_octavia_model(
+                pool_dict['listener'])
+            if pool.id not in [_pool.id for _pool in listener.pools]:
+                listener.pools.append(ret)
+            if (not listener.default_pool) \
+                    or (listener.default_pool_id == pool.id):
+                listener.default_pool = ret
+            listeners = [listener]
+            args.update({
+                'listeners': listeners,
+            })
+            if listener.load_balancer:
+                if pool.id not in [_pool.id for _pool
+                                   in listener.load_balancer.pools]:
+                    listener.load_balancer.pools.append(ret)
+                args.update({
+                    'load_balancer': listener.load_balancer,
+                    'load_balancer_id': listener.load_balancer_id,
+                })
+        if pool_dict.get('members'):
+            members = []
+            for member_dict in pool_dict.get('members'):
+                member = self.get_member_octavia_model(member_dict)
+                if not member.pool:
+                    member.pool = ret
+                members.append(member)
+            args.update({
+                'members': members
+            })
+
+        # TODO: HealthMonitor, L7Policy are not added
+        args.update({
+            'protocol': pool.protocol,
+            'lb_algorithm': pool.lb_algorithm,
+            'session_persistence': pool.session_persistence,
+        })
+        ret = self._update(ret, args)
+        return ret
+
+    # Translate member neutron model dict to octavia model
+    def get_member_octavia_model(self, member_dict):
+        member = n_data_models.Member.from_dict(
+            copy.deepcopy(member_dict)
+        )
+        ret = o_data_models.Member()
+        args = {
+            'id': member.id,
+            'project_id': member.tenant_id,
+            'pool_id': member.pool_id,
+            'ip_address': member.address,
+            'protocol_port': member.protocol_port,
+            'weight': member.weight,
+            'enable': member.admin_state_up,
+            'subnet_id': member.subnet_id,
+            'operating_status': member.operating_status,
+        }
+        if member_dict.get('pool'):
+            pool = self.get_pool_octavia_model(member_dict['pool'])
+            args.update({
+                'pool': pool
+            })
+        ret = self._update(ret, args)
+        return ret
+
+
+
 
 
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
@@ -314,33 +395,46 @@ class HaproxyListenerManager(HaproxyCommonManager,
 class HaproxyPoolManager(HaproxyCommonManager,
                          n_driver_base.BasePoolManager):
 
-    def create(self, context, obj):
+    def create(self, context, pool):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, pool['id'])
+        pool_o_obj = self.driver.o_models_builder.\
+            get_pool_octavia_model(pool)
+        # For Mitaka, that would be multiple listeners within pool
+        listener_o_obj = pool_o_obj.listeners[0]
+        load_balancer_o_obj = pool_o_obj.load_balancer
+        self.driver.amphora_driver.update(listener_o_obj,
+                                          load_balancer_o_obj.vip)
 
-    def update(self, context, old_obj, obj):
+    def update(self, context, old_pool, pool):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, update %s", self.__class__.__name__, pool['id'])
 
-    def delete(self, context, obj):
+    def delete(self, context, pool):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, pool['id'])
 
 
 class HaproxyMemberManager(HaproxyCommonManager,
                            n_driver_base.BaseMemberManager):
 
-    def create(self, context, obj):
+    def create(self, context, member):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, member['id'])
+        member_o_obj = self.driver.o_models_builder.\
+            get_member_octavia_model(member)
+        listener_o_obj = member_o_obj.pool.listeners[0]
+        load_balancer_o_obj = member_o_obj.pool.load_balancer
+        self.driver.amphora_driver.update(listener_o_obj,
+                                          load_balancer_o_obj.vip)
 
-    def update(self, context, old_obj, obj):
+    def update(self, context, old_member, member):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, update %s", self.__class__.__name__, member['id'])
 
-    def delete(self, context, obj):
+    def delete(self, context, member):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, member['id'])
 
 
 class HaproxyHealthMonitorManager(HaproxyCommonManager,
