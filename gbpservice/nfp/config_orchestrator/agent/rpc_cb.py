@@ -13,6 +13,7 @@
 import importlib
 from gbpservice.nfp.core import poll as core_pt
 from gbpservice.nfp.config_orchestrator.agent import loadbalancer as lb
+from gbpservice.nfp.config_orchestrator.agent import loadbalancerv2 as lbv2
 from gbpservice.nfp.config_orchestrator.agent import firewall as fw
 from gbpservice.nfp.config_orchestrator.agent import vpn as vpn
 from gbpservice.nfp.config_orchestrator.agent import generic as gc
@@ -22,6 +23,7 @@ import json
 LOG = logging.getLogger(__name__)
 
 CONFIG_AGENT_MODULES = {'loadbalancer': lb,
+                        'loadbalancerv2': lb,
                         'firewall': fw,
                         'vpn': vpn,
                         'generic': gc}

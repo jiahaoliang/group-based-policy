@@ -20,6 +20,18 @@ from gbpservice.nfp.config_orchestrator.agent.common import *
 from gbpservice.nfp.lib.transport import *
 
 
+def update_status(**kwargs):
+    rpcClient = RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
+    context = kwargs.get('context')
+    rpc_ctx = n_context.Context.from_dict(context)
+    del kwargs['context']
+    rpcClient.cctxt.cast(rpc_ctx, 'update_status',
+                         obj_type=kwargs['obj_type'],
+                         obj_id=kwargs['obj_id'],
+                         provisioning_status=kwargs['provisioning_status'],
+                         operating_status=kwargs['operating_status'])
+
+
 LOG = logging.getLogger(__name__)
 
 # class ForkedPdb(pdb.Pdb):
