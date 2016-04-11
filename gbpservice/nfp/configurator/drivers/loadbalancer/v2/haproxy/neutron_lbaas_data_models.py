@@ -760,8 +760,9 @@ SA_MODEL_TO_DATA_MODEL_MAP = {
     models.HealthMonitorV2: HealthMonitor,
     models.Listener: Listener,
     models.SNI: SNI,
-    models.L7Rule: L7Rule,
-    models.L7Policy: L7Policy,
+    # L7Policy and L7Rule are for Mitaka only
+    # models.L7Rule: L7Rule,
+    # models.L7Policy: L7Policy,
     models.PoolV2: Pool,
     models.MemberV2: Member,
     models.LoadBalancerStatistics: LoadBalancerStatistics,
@@ -776,8 +777,9 @@ DATA_MODEL_TO_SA_MODEL_MAP = {
     HealthMonitor: models.HealthMonitorV2,
     Listener: models.Listener,
     SNI: models.SNI,
-    L7Rule: models.L7Rule,
-    L7Policy: models.L7Policy,
+    # L7Policy and L7Rule are for Mitaka only
+    # L7Rule: models.L7Rule,
+    # L7Policy: models.L7Policy,
     Pool: models.PoolV2,
     Member: models.MemberV2,
     LoadBalancerStatistics: models.LoadBalancerStatistics,

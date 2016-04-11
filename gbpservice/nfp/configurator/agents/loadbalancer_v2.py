@@ -458,14 +458,16 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
 
     def _root_loadbalancer_id(self, obj_type, obj_dict):
         """Returns the loadbalancer id this instance is attached to."""
+
         try:
+            # TODO: For Mitaka
             if obj_type == 'loadbalancer':
                 lb = obj_dict['id']
             elif obj_type == 'listener':
                 lb = obj_dict['loadbalancer']['id']
             elif obj_type == 'l7policy':
                 lb = obj_dict['listener']['loadbalancer']['id']
-            elif obj_type == 'l7policy':
+            elif obj_type == 'l7rule':
                 lb = obj_dict['policy']['listener']['loadbalancer']['id']
             elif obj_type == 'pool':
                 lb = obj_dict['loadbalancer']['id']
@@ -474,6 +476,18 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
             else:
                 # Pool Member or Health Monitor
                 lb = obj_dict['pool']['loadbalancer']['id']
+            # For Liberty
+            if obj_type == 'loadbalancer':
+                lb = obj_dict['id']
+            elif obj_type == 'listener':
+                lb = obj_dict['loadbalancer']['id']
+            elif obj_type == 'pool':
+                lb = obj_dict['listener']['loadbalancer']['id']
+            elif obj_type == 'sni':
+                lb = obj_dict['listener']['loadbalancer']['id']
+            else:
+                # Pool Member or Health Monitor
+                lb = obj_dict['pool']['listener']['loadbalancer']['id']
         except Exception:
             raise exceptions.IncompleteData(
                 'Root loadbalancer id was not found')
