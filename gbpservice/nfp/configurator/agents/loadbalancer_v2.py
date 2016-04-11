@@ -313,7 +313,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
         arg_dict = {'context': context,
                     'member': member,
                     }
-        self._send_event(lb_constants.EVENT_CREATE_Member, arg_dict,
+        self._send_event(lb_constants.EVENT_CREATE_MEMBER, arg_dict,
                          serialize=True, binding_key=member['pool_id'],
                          key=member['id'])
 
