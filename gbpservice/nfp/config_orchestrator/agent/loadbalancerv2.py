@@ -13,8 +13,8 @@
 import pdb
 import sys
 from neutron_lbaas.agent import agent_api
-from neutron_lbaas.services.loadbalancer import constants as lb_const
 from neutron_lbaas.db.loadbalancer import loadbalancer_dbv2
+from gbpservice.nfp.configurator.lib import lbv2_constants as lb_constants
 from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
 from gbpservice.nfp.config_orchestrator.agent.common import *
 from gbpservice.nfp.lib.transport import *
@@ -25,11 +25,25 @@ def update_status(**kwargs):
     context = kwargs.get('context')
     rpc_ctx = n_context.Context.from_dict(context)
     del kwargs['context']
+    lb_p_status = lb_constants.ACTIVE
+    lb_o_status = None
+    obj_p_status = kwargs['provisioning_status']
+    obj_o_status = kwargs['operating_status']
+    if kwargs['obj_type'] == 'healthmonitor':
+            obj_o_status = None
+
+    if kwargs['obj_type'] != 'loadbalancer':
+        rpcClient.cctxt.cast(rpc_ctx, 'update_status',
+                             obj_type=kwargs['obj_type'],
+                             obj_id=kwargs['obj_id'],
+                             provisioning_status=obj_p_status,
+                             operating_status=obj_o_status)
+
     rpcClient.cctxt.cast(rpc_ctx, 'update_status',
-                         obj_type=kwargs['obj_type'],
-                         obj_id=kwargs['obj_id'],
-                         provisioning_status=kwargs['provisioning_status'],
-                         operating_status=kwargs['operating_status'])
+                         obj_type='loadbalancer',
+                         obj_id=kwargs['root_lb_id'],
+                         provisioning_status=lb_p_status,
+                         operating_status=lb_o_status)
 
 
 LOG = logging.getLogger(__name__)

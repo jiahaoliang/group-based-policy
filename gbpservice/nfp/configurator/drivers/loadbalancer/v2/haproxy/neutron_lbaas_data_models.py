@@ -754,3 +754,35 @@ class LoadBalancer(BaseDataModel):
                 provider)
         return super(LoadBalancer, cls).from_dict(model_dict)
 
+
+SA_MODEL_TO_DATA_MODEL_MAP = {
+    models.LoadBalancer: LoadBalancer,
+    models.HealthMonitorV2: HealthMonitor,
+    models.Listener: Listener,
+    models.SNI: SNI,
+    models.L7Rule: L7Rule,
+    models.L7Policy: L7Policy,
+    models.PoolV2: Pool,
+    models.MemberV2: Member,
+    models.LoadBalancerStatistics: LoadBalancerStatistics,
+    models.SessionPersistenceV2: SessionPersistence,
+    models_v2.IPAllocation: IPAllocation,
+    models_v2.Port: Port,
+    servicetype_db.ProviderResourceAssociation: ProviderResourceAssociation
+}
+
+DATA_MODEL_TO_SA_MODEL_MAP = {
+    LoadBalancer: models.LoadBalancer,
+    HealthMonitor: models.HealthMonitorV2,
+    Listener: models.Listener,
+    SNI: models.SNI,
+    L7Rule: models.L7Rule,
+    L7Policy: models.L7Policy,
+    Pool: models.PoolV2,
+    Member: models.MemberV2,
+    LoadBalancerStatistics: models.LoadBalancerStatistics,
+    SessionPersistence: models.SessionPersistenceV2,
+    IPAllocation: models_v2.IPAllocation,
+    Port: models_v2.Port,
+    ProviderResourceAssociation: servicetype_db.ProviderResourceAssociation
+}

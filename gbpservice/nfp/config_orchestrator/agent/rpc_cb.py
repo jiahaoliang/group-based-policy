@@ -23,7 +23,7 @@ import json
 LOG = logging.getLogger(__name__)
 
 CONFIG_AGENT_MODULES = {'loadbalancer': lb,
-                        'loadbalancerv2': lb,
+                        'loadbalancerv2': lbv2,
                         'firewall': fw,
                         'vpn': vpn,
                         'generic': gc}
