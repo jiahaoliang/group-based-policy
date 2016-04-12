@@ -35,10 +35,10 @@ from octavia.common import constants
 # Assume orchestrator already created this amphora
 # TODO: This part need to be removed once the ochestartor part is done
 AMP = o_data_models.Amphora(
-    lb_network_ip = "10.0.134.4",
+    lb_network_ip = "11.0.0.4",
     id = "121daa13-d64b-4aae-ba4c-6aa001971ed7",
     status = constants.ACTIVE,
-    compute_id = "a1931b26-5635-49b6-917e-4da8f622389e"
+    compute_id = "a12acb28-4ff0-438e-9d1e-e3a825eb9fc0"
 )
 
 LOG = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class OctaviaDataModelBuilder(object):
         if loadbalancer_dict.get('listeners'):
             listeners = []
             pools = []
-            for listener_dict in loadbalancer_dict['listeners']:
+            for listener_dict in loadbalancer_dict.get('listeners'):
                 listener = self.get_listener_octavia_model(listener_dict)
                 listener.load_balancer = ret
                 listeners.append(listener)
@@ -130,13 +130,14 @@ class OctaviaDataModelBuilder(object):
         ret = o_data_models.Listener()
         args = self._get_common_args(listener)
         sni_containers = []
-        sni_containers.extend(
-            o_data_models.SNI.from_dict(sni_dict)
-            for sni_dict in listener_dict['sni_containers']
-        )
+        if listener_dict.get('sni_containers'):
+            sni_containers.extend(
+                o_data_models.SNI.from_dict(sni_dict)
+                for sni_dict in listener_dict.get('sni_containers')
+            )
         if listener_dict.get('loadbalancer'):
             loadbalancer = self.get_loadbalancer_octavia_model(
-                listener_dict['loadbalancer'])
+                listener_dict.get('loadbalancer'))
             if listener.id not in [_listener.id for _listener
                                    in loadbalancer.listeners]:
                 loadbalancer.listeners.append(ret)
@@ -145,7 +146,7 @@ class OctaviaDataModelBuilder(object):
             })
         if listener_dict.get('default_pool'):
             pool = self.get_pool_octavia_model(
-                listener_dict['default_pool'])
+                listener_dict.get('default_pool'))
             if listener.id not in [_listener.id for _listener
                                    in pool.listeners]:
                 pool.listeners.append(ret)
@@ -179,7 +180,7 @@ class OctaviaDataModelBuilder(object):
         # there are pool.listeners. We need to handle that
         if pool_dict.get('listener'):
             listener = self.get_listener_octavia_model(
-                pool_dict['listener'])
+                pool_dict.get('listener'))
             if pool.id not in [_pool.id for _pool in listener.pools]:
                 listener.pools.append(ret)
             if (not listener.default_pool) \
@@ -235,7 +236,7 @@ class OctaviaDataModelBuilder(object):
             'operating_status': member.operating_status,
         }
         if member_dict.get('pool'):
-            pool = self.get_pool_octavia_model(member_dict['pool'])
+            pool = self.get_pool_octavia_model(member_dict.get('pool'))
             args.update({
                 'pool': pool
             })
@@ -289,53 +290,75 @@ class HaproxyCommonManager(object):
 class HaproxyLoadBalancerManager(HaproxyCommonManager,
                                  n_driver_base.BaseLoadBalancerManager):
 
-    def create(self, context, loadbalancer, amp=AMP):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
-        # plug network
-        # plug vip
-        loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
-
-        # Get vip_subnet
-        for subnet_dict in context['service_info']['subnets']:
-            if subnet_dict['id'] == loadbalancer_obj.vip_subnet_id:
-                vip_subnet = n_data_models.Subnet.from_dict(subnet_dict)
-                break
-        if vip_subnet is None:
-            raise exceptions.IncompleteData(
-                "VIP subnet information is not found")
-
-        # Get vip_port
-        for port_dict in context['service_info']['ports']:
-            if port_dict['id'] == loadbalancer_obj.vip_port_id:
-                vip_port = n_data_models.Port.from_dict(port_dict)
-                break
-        if vip_port is None:
-            raise  exceptions.IncompleteData(
-                "VIP port information is not found")
-
-        # Get vrrp_port
-        for port_dict in context['service_info']['ports']:
-            if port_dict['device_id'] == amp.compute_id:
-                for fix_ip in port_dict['fixed_ips']:
-                    if fix_ip['subnet_id']== loadbalancer_obj.vip_subnet_id:
-                        vrrp_port = n_data_models.Port.from_dict(port_dict)
-                        break
-        if vrrp_port is None:
-            raise  exceptions.IncompleteData(
-                "VRRP port information is not found")
+    def _get_amphorae_network_config(self,
+                                     context,
+                                     loadbalancer_dict,
+                                     loadbalancer_o_obj):
+        loadbalancer_n_obj = n_data_models.LoadBalancer.from_dict(
+            copy.deepcopy(loadbalancer_dict))
 
         amphorae_network_config = {}
 
-        amphorae_network_config[amp.id] = data_models.AmphoraNetworkConfig(
-            amphora=amp,
-            vip_subnet=vip_subnet,
-            vip_port=vip_port,
-            vrrp_port=vrrp_port
-        )
+        for amp in loadbalancer_o_obj.amphorae:
+            if amp.status != constants.DELETED:
+                # Get vip_subnet
+                vip_subnet = None
+                for subnet_dict in context['service_info']['subnets']:
+                    if subnet_dict['id'] == loadbalancer_n_obj.vip_subnet_id:
+                        vip_subnet = n_data_models.Subnet.from_dict(
+                            copy.deepcopy(subnet_dict))
+                        break
+                if vip_subnet is None:
+                    raise exceptions.IncompleteData(
+                        "VIP subnet information is not found")
 
+                # Get vip_port
+                vip_port = None
+                for port_dict in context['service_info']['ports']:
+                    if port_dict['id'] == loadbalancer_n_obj.vip_port_id:
+                        vip_port = n_data_models.Port.from_dict(
+                            copy.deepcopy(port_dict))
+                        break
+                if vip_port is None:
+                    raise  exceptions.IncompleteData(
+                        "VIP port information is not found")
+
+                # Get vrrp_port
+                vrrp_port = None
+                for port_dict in context['service_info']['ports']:
+                    if port_dict['device_id'] == amp.compute_id:
+                        for fix_ip in port_dict['fixed_ips']:
+                            if fix_ip['subnet_id'] == \
+                                    loadbalancer_n_obj.vip_subnet_id:
+                                vrrp_port = n_data_models.Port.from_dict(
+                                    copy.deepcopy(port_dict))
+                                break
+                        if vrrp_port is not None:
+                            break
+                if vrrp_port is None:
+                    raise exceptions.IncompleteData(
+                        "VRRP port information is not found")
+
+                amphorae_network_config[amp.id] = \
+                    data_models.AmphoraNetworkConfig(
+                        amphora=amp,
+                        vip_subnet=vip_subnet,
+                        vip_port=vip_port,
+                        vrrp_port=vrrp_port
+                    )
+
+        return amphorae_network_config
+
+    def create(self, context, loadbalancer):
+        ForkedPdb().set_trace()
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
+
+        loadbalancer_o_obj = self.driver.o_models_builder.\
+            get_loadbalancer_octavia_model(loadbalancer)
+        amphorae_network_config = self._get_amphorae_network_config(
+                                     context, loadbalancer, loadbalancer_o_obj)
         self.driver.amphora_driver.post_vip_plug(
-                loadbalancer_obj, amphorae_network_config)
+                loadbalancer_o_obj, amphorae_network_config)
         LOG.info("Notfied amphora of vip plug")
 
     def update(self, context, old_loadbalancer, loadbalancer):
