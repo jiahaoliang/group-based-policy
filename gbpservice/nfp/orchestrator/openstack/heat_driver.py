@@ -1061,7 +1061,8 @@ class HeatDriver():
                   'provider': provider['id']})
         # self._wait_for_stack_operation_complete(heatclient, stack_id,
         #                                         "create")
-        if service_profile['service_type'] == pconst.LOADBALANCER:
+        if service_profile['service_type'] in [pconst.LOADBALANCER,
+                                               pconst.LOADBALANCERV2]:
             auth_token, provider_tenant_id = self._get_tenant_context(
                 provider_tenant_id)
             self._create_policy_target_for_vip(auth_token,
