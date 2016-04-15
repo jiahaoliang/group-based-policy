@@ -20,6 +20,7 @@ from oslo_log import log as logging
 from neutron_lbaas.drivers import driver_base as n_driver_base
 
 from gbpservice.nfp.common import exceptions
+from gbpservice.nfp.configurator.lib import lbv2_constants
 from gbpservice.nfp.configurator.drivers.base import base_driver
 
 from gbpservice.nfp.configurator.drivers.loadbalancer.\
@@ -244,9 +245,6 @@ class OctaviaDataModelBuilder(object):
         return ret
 
 
-
-
-
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
@@ -274,6 +272,23 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     # Get Amphora object given the loadbalancer_id
     def get_amphora(self, loadbalancer_id):
         return [AMP]
+
+    def configure_healthmonitor(self, context, kwargs):
+        """Overriding BaseDriver's configure_healthmonitor().
+           It does netcat to HAPROXY_AGENT_LISTEN_PORT 1234.
+           HaProxy agent runs inside service vm..Once agent is up and
+           reachable, service vm is assumed to be active.
+
+           :param context - context
+           :param kwargs - kwargs coming from orchestrator
+
+           Returns: SUCCESS/FAILED
+
+        """
+        ip = kwargs.get('mgmt_ip')
+        port = str(lbv2_constants.HAPROXY_AGENT_LISTEN_PORT)
+        command = 'nc ' + ip + ' ' + port + ' -z'
+        return self._check_vm_health(command)
 
 class HaproxyCommonManager(object):
 
