@@ -121,16 +121,21 @@ class NodeDBUpdateException(n_exc.NeutronException):
 
 class HeatDriver():
     SUPPORTED_SERVICE_TYPES = [pconst.LOADBALANCER, pconst.FIREWALL,
-                               pconst.VPN
+                               pconst.VPN, pconst.LOADBALANCERV2
                                ]
     SUPPORTED_SERVICE_VENDOR_MAPPING = {pconst.LOADBALANCER: ["haproxy"],
                                         pconst.FIREWALL: ["vyos", "asav"],
-                                        pconst.VPN: ["vyos", "asav"]
+                                        pconst.VPN: ["vyos", "asav"],
+                                        pconst.LOADBALANCERV2:
+                                            ["haproxy_lbaasv2"]
                                         }
     vendor_name = 'oneconvergence'
     required_heat_resources = {
         pconst.LOADBALANCER: ['OS::Neutron::LoadBalancer',
                               'OS::Neutron::Pool'],
+        pconst.LOADBALANCERV2: ['OS::Neutron::LBaaS::LoadBalancer',
+                                'OS::Neutron::LBaaS::Listener',
+                                'OS::Neutron::LBaaS::Pool'],
         pconst.FIREWALL: ['OS::Neutron::Firewall',
                           'OS::Neutron::FirewallPolicy'],
         pconst.VPN: ['OS::Neutron::VPNService']
@@ -159,11 +164,14 @@ class HeatDriver():
             self.resource_owner_tenant_id = None
         return self.resource_owner_tenant_id
 
+    # TODO: (jiahao) Need to see whether it break lbaasv1 support
     def lbaas_plugin(self):
         if self._lbaas_plugin:
             return self._lbaas_plugin
+        # self._lbaas_plugin = manager.NeutronManager.get_service_plugins().get(
+        #     pconst.LOADBALANCER)
         self._lbaas_plugin = manager.NeutronManager.get_service_plugins().get(
-            pconst.LOADBALANCER)
+            pconst.LOADBALANCERV2)
         return self._lbaas_plugin
 
     def _resource_owner_tenant_id(self):
@@ -687,7 +695,7 @@ class HeatDriver():
             auth_token, provider_port['fixed_ips'][0][
                 'subnet_id'])['subnet']['cidr']
         service_vendor = service_profile['service_flavor']
-        if service_type == pconst.LOADBALANCER:
+        if service_type in [pconst.LOADBALANCER, pconst.LOADBALANCERV2]:
             self._generate_pool_members(
                 auth_token, stack_template, config_param_values,
                 provider, is_template_aws_version)
@@ -1221,7 +1229,8 @@ class HeatDriver():
         mgmt_ip = service_details['mgmt_ip']
         stack_id = service_details['heat_stack_id']
 
-        if service_profile['service_type'] == pconst.LOADBALANCER:
+        if service_profile['service_type'] in [pconst.LOADBALANCER,
+                                               pconst.LOADBALANCERV2]:
             if self._is_service_target(policy_target):
                 return
             auth_token, resource_owner_tenant_id =\
@@ -1245,7 +1254,8 @@ class HeatDriver():
         mgmt_ip = service_details['mgmt_ip']
         stack_id = service_details['heat_stack_id']
 
-        if service_profile['service_type'] == pconst.LOADBALANCER:
+        if service_profile['service_type'] in [pconst.LOADBALANCER,
+                                               pconst.LOADBALANCERV2]:
             if self._is_service_target(policy_target):
                 return
             auth_token, resource_owner_tenant_id =\

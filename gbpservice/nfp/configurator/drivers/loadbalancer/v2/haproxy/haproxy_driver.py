@@ -249,7 +249,7 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
 
-    def __init__(self, plugin):
+    def __init__(self, plugin=None):
         super(HaproxyLoadBalancerDriver, self).__init__(plugin)
 
         # Each of the major LBaaS objects in the neutron database
