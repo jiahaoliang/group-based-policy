@@ -65,8 +65,10 @@ class NotificationHandler(object):
     def update_status(self, resource, **kwargs):
         if resource == 'vpn':
             self._update_status_vpn(**kwargs)
-        else:
+        elif resource == 'loadbalancer':
             self._update_status_lb(**kwargs)
+        elif resource == 'loadbalancerv2':
+            self._update_status_lbv2(**kwargs)
 
     def _update_status_vpn(self, **kwargs):
         rpcClient = RPCClient(a_topics.VPN_NFP_CONFIGAGENT_TOPIC)
@@ -78,6 +80,15 @@ class NotificationHandler(object):
 
     def _update_status_lb(self, **kwargs):
         rpcClient = RPCClient(a_topics.LB_NFP_CONFIGAGENT_TOPIC)
+        rpcClient.cctxt = rpcClient.client.prepare(
+            version=const.LOADBALANCER_RPC_API_VERSION)
+        context = kwargs.get('context')
+        rpc_ctx = n_context.Context.from_dict(context)
+        del kwargs['context']
+        rpcClient.cctxt.cast(rpc_ctx, 'update_status', kwargs=kwargs)
+
+    def _update_status_lbv2(self, **kwargs):
+        rpcClient = RPCClient(a_topics.LBV2_NFP_CONFIGAGENT_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
             version=const.LOADBALANCER_RPC_API_VERSION)
         context = kwargs.get('context')

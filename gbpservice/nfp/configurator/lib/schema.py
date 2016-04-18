@@ -38,6 +38,7 @@ skip_kwargs_validation_for = [
                                 'firewall',
                                 'vpn',
                                 'loadbalancer',
+                                'loadbalancerv2',
                                 'config_script'
                              ]
 

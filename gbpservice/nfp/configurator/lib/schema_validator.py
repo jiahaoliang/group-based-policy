@@ -61,7 +61,8 @@ class SchemaValidator(object):
                       interfaces and routes
                 """
                 if (service_type in schema.skip_kwargs_validation_for or
-                        (resource['service_type'] == 'loadbalancer' and
+                        (resource['service_type'] in
+                            ['loadbalancer', 'loadbalancerv2'] and
                             resource_type != 'healthmonitor')):
                         continue
 

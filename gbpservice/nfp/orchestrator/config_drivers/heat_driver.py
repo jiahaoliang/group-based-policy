@@ -124,16 +124,21 @@ class NodeDBUpdateException(n_exc.NeutronException):
 
 class HeatDriver(object):
     SUPPORTED_SERVICE_TYPES = [pconst.LOADBALANCER, pconst.FIREWALL,
-                               pconst.VPN
+                               pconst.VPN, pconst.LOADBALANCERV2
                                ]
     SUPPORTED_SERVICE_VENDOR_MAPPING = {pconst.LOADBALANCER: ["haproxy"],
                                         pconst.FIREWALL: ["vyos", "asav"],
-                                        pconst.VPN: ["vyos", "asav"]
+                                        pconst.VPN: ["vyos", "asav"],
+                                        pconst.LOADBALANCERV2:
+                                            ["haproxy_lbaasv2"]
                                         }
     vendor_name = 'NFP'
     required_heat_resources = {
         pconst.LOADBALANCER: ['OS::Neutron::LoadBalancer',
                               'OS::Neutron::Pool'],
+        pconst.LOADBALANCERV2: ['OS::Neutron::LBaaS::LoadBalancer',
+                                'OS::Neutron::LBaaS::Listener',
+                                'OS::Neutron::LBaaS::Pool'],
         pconst.FIREWALL: ['OS::Neutron::Firewall',
                           'OS::Neutron::FirewallPolicy'],
         pconst.VPN: ['OS::Neutron::VPNService']
@@ -298,7 +303,8 @@ class HeatDriver(object):
         # provider = service_details['policy_target_group']
         # provider = service_details['provider_ptg']
         # provider_tenant_id = provider['tenant_id']
-        if service_profile['service_type'] == pconst.LOADBALANCER:
+        if service_profile['service_type'] in [pconst.LOADBALANCER,
+                                               pconst.LOADBALANCERV2]:
             network_function_instance = network_function_details.get(
                 'network_function_instance')
             if network_function_instance:
@@ -720,7 +726,7 @@ class HeatDriver(object):
         standby_provider_port_mac = None
 
         service_vendor = service_profile['service_flavor']
-        if service_type == pconst.LOADBALANCER:
+        if service_type in [pconst.LOADBALANCER, pconst.LOADBALANCERV2]:
             self._generate_pool_members(
                 auth_token, stack_template, config_param_values,
                 provider, is_template_aws_version)
@@ -1344,7 +1350,8 @@ class HeatDriver(object):
         mgmt_ip = service_details['mgmt_ip']
         stack_id = service_details['heat_stack_id']
 
-        if service_profile['service_type'] == pconst.LOADBALANCER:
+        if service_profile['service_type'] in [pconst.LOADBALANCER,
+                                               pconst.LOADBALANCERV2]:
             if self._is_service_target(policy_target):
                 return
             auth_token, resource_owner_tenant_id =\
