@@ -43,6 +43,8 @@ AMP = o_data_models.Amphora(
     compute_id = "a12acb28-4ff0-438e-9d1e-e3a825eb9fc0"
 )
 
+DRIVER_NAME = 'loadbalancerv2'
+
 LOG = logging.getLogger(__name__)
 
 
