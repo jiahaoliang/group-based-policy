@@ -23,14 +23,33 @@ import requests
 import six
 from stevedore import driver as stevedore_driver
 
-from octavia.amphorae.driver_exceptions import exceptions as driver_except
-from octavia.amphorae.drivers import driver_base as driver_base
-from octavia.amphorae.drivers.haproxy import exceptions as exc
-from octavia.amphorae.drivers.keepalived import vrrp_rest_driver
-from octavia.common.jinja.haproxy import jinja_cfg
-from octavia.common import constants
-from octavia.common.tls_utils import cert_parser
-from octavia.i18n import _LW
+# from octavia_lib.amphorae.driver_exceptions import exceptions as driver_except
+# from octavia_lib.amphorae.drivers import driver_base as driver_base
+# from octavia_lib.amphorae.drivers.haproxy import exceptions as exc
+# # TODO(jiahao): drop vrrp temporarily
+# # from octavia_lib.amphorae.drivers.keepalived import vrrp_rest_driver
+# from octavia_lib.common.jinja.haproxy import jinja_cfg
+# from octavia_lib.common import constants
+# from octavia_lib.common.tls_utils import cert_parser
+# from octavia_lib.i18n import _LW
+
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    amphorae.driver_exceptions import exceptions as driver_except
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    amphorae.drivers import driver_base as driver_base
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    amphorae.drivers.haproxy import exceptions as exc
+# TODO(jiahao): drop vrrp temporarily
+# from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+#     amphorae.drivers.keepalived import vrrp_rest_driver
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common.jinja.haproxy import jinja_cfg
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import constants
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common.tls_utils import cert_parser
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    i18n import _LW
 
 from oslo_config import cfg
 
@@ -100,10 +119,12 @@ OCTAVIA_API_CLIENT = (
     "(https://wiki.openstack.org/wiki/Octavia)").format(version=API_VERSION)
 
 
+# TODO(jiahao): drop vrrp temporarily
+# class HaproxyAmphoraLoadBalancerDriver(
+#         driver_base.AmphoraLoadBalancerDriver,
+#         vrrp_rest_driver.KeepalivedAmphoraDriverMixin):
 class HaproxyAmphoraLoadBalancerDriver(
-        driver_base.AmphoraLoadBalancerDriver,
-        vrrp_rest_driver.KeepalivedAmphoraDriverMixin):
-
+        driver_base.AmphoraLoadBalancerDriver):
     def __init__(self):
         super(HaproxyAmphoraLoadBalancerDriver, self).__init__()
         self.client = AmphoraAPIClient()

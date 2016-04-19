@@ -12,110 +12,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy.octavia_data_models as models
+from octavia.common import data_models
 
 
-# Amphorae Data Models
-
-class Topology(models.BaseDataModel):
-
-    def __init__(self, hostname=None, uuid=None, topology=None, role=None,
-                 ip=None, ha_ip=None):
-        self.hostname = hostname
-        self.uuid = uuid
-        self.topology = topology
-        self.role = role
-        self.ip = ip
-        self.ha_ip = ha_ip
-
-
-class Info(models.BaseDataModel):
-
-    def __init__(self, hostname=None, uuid=None, version=None,
-                 api_version=None):
-        self.hostname = hostname
-        self.uuid = uuid
-        self.version = version
-        self.api_version = api_version
-
-
-class Details(models.BaseDataModel):
-
-    def __init__(self, hostname=None, uuid=None, version=None,
-                 api_version=None, network_tx=None, network_rx=None,
-                 active=None, haproxy_count=None, cpu=None, memory=None,
-                 disk=None, load=None, listeners=None, packages=None):
-        self.hostname = hostname
-        self.uuid = uuid,
-        self.version = version
-        self.api_version = api_version
-        self.network_tx = network_tx
-        self.network_rx = network_rx
-        self.active = active
-        self.haproxy_count = haproxy_count
-        self.cpu = cpu
-        self.memory = memory
-        self.disk = disk
-        self.load = load or []
-        self.listeners = listeners or []
-        self.packages = packages or []
-
-
-class CPU(models.BaseDataModel):
-
-    def __init__(self, total=None, user=None, system=None, soft_irq=None):
-        self.total = total
-        self.user = user
-        self.system = system
-        self.soft_irq = soft_irq
-
-
-class Memory(models.BaseDataModel):
-
-    def __init__(self, total=None, free=None, available=None, buffers=None,
-                 cached=None, swap_used=None, shared=None, slab=None,
-                 committed_as=None):
-        self.total = total
-        self.free = free
-        self.available = available
-        self.buffers = buffers
-        self.cached = cached
-        self.swap_used = swap_used
-        self.shared = shared
-        self.slab = slab
-        self.committed_as = committed_as
-
-
-class Disk(models.BaseDataModel):
-
-    def __init__(self, used=None, available=None):
-        self.used = used
-        self.available = available
-
-
-class ListenerStatus(models.BaseDataModel):
-
-    def __init__(self, status=None, uuid=None, provisioning_status=None,
-                 type=None, pools=None):
-        self.status = status
-        self.uuid = uuid
-        self.provisioning_status = provisioning_status
-        self.type = type
-        self.pools = pools or []
-
-
-class Pool(models.BaseDataModel):
-
-    def __init__(self, uuid=None, status=None, members=None):
-        self.uuid = uuid
-        self.status = status
-        self.members = members or []
-
-
-# Network Data Models
-
-class Interface(models.BaseDataModel):
+class Interface(data_models.BaseDataModel):
 
     def __init__(self, id=None, compute_id=None, network_id=None,
                  fixed_ips=None, port_id=None):
@@ -126,7 +26,7 @@ class Interface(models.BaseDataModel):
         self.fixed_ips = fixed_ips
 
 
-class Delta(models.BaseDataModel):
+class Delta(data_models.BaseDataModel):
 
     def __init__(self, amphora_id=None, compute_id=None,
                  add_nics=None, delete_nics=None):
@@ -136,7 +36,7 @@ class Delta(models.BaseDataModel):
         self.delete_nics = delete_nics
 
 
-class Network(models.BaseDataModel):
+class Network(data_models.BaseDataModel):
 
     def __init__(self, id=None, name=None, subnets=None,
                  project_id=None, admin_state_up=None, mtu=None,
@@ -156,7 +56,7 @@ class Network(models.BaseDataModel):
         self.mtu = mtu
 
 
-class Subnet(models.BaseDataModel):
+class Subnet(data_models.BaseDataModel):
 
     def __init__(self, id=None, name=None, network_id=None, project_id=None,
                  gateway_ip=None, cidr=None, ip_version=None):
@@ -169,7 +69,7 @@ class Subnet(models.BaseDataModel):
         self.ip_version = ip_version
 
 
-class Port(models.BaseDataModel):
+class Port(data_models.BaseDataModel):
 
     def __init__(self, id=None, name=None, device_id=None, device_owner=None,
                  mac_address=None, network_id=None, status=None,
@@ -193,7 +93,7 @@ class Port(models.BaseDataModel):
                 return fixed_ip.subnet_id
 
 
-class FixedIP(models.BaseDataModel):
+class FixedIP(data_models.BaseDataModel):
 
     def __init__(self, subnet_id=None, ip_address=None, subnet=None):
         self.subnet_id = subnet_id
@@ -201,7 +101,7 @@ class FixedIP(models.BaseDataModel):
         self.subnet = subnet
 
 
-class AmphoraNetworkConfig(models.BaseDataModel):
+class AmphoraNetworkConfig(data_models.BaseDataModel):
 
     def __init__(self, amphora=None, vip_subnet=None, vip_port=None,
                  vrrp_subnet=None, vrrp_port=None, ha_subnet=None,
@@ -213,5 +113,3 @@ class AmphoraNetworkConfig(models.BaseDataModel):
         self.vrrp_port = vrrp_port
         self.ha_subnet = ha_subnet
         self.ha_port = ha_port
-
-

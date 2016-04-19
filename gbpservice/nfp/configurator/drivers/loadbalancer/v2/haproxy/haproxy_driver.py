@@ -25,14 +25,14 @@ from gbpservice.nfp.configurator.drivers.base import base_driver
 
 from gbpservice.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import neutron_lbaas_data_models as n_data_models
-from gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy import octavia_data_models as o_data_models
-from gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy.rest_api_driver import HaproxyAmphoraLoadBalancerDriver
-from gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy import haproxy_data_models
-import gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy.octavia_constants as constants
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import data_models as o_data_models
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.\
+    rest_api_driver import HaproxyAmphoraLoadBalancerDriver
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    network import data_models as network_data_models
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import constants
 
 # Assume orchestrator already created this amphora
 # TODO: This part need to be removed once the ochestartor part is done
@@ -358,7 +358,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                         "VRRP port information is not found")
 
                 amphorae_network_config[amp.id] = \
-                    haproxy_data_models.AmphoraNetworkConfig(
+                    network_data_models.AmphoraNetworkConfig(
                         amphora=amp,
                         vip_subnet=vip_subnet,
                         vip_port=vip_port,

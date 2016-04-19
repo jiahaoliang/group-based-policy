@@ -18,8 +18,8 @@ import re
 
 from sqlalchemy.orm import collections
 
-import gbpservice.nfp.configurator.drivers.loadbalancer.\
-    v2.haproxy.octavia_constants as constants
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import constants
 
 
 class BaseDataModel(object):
