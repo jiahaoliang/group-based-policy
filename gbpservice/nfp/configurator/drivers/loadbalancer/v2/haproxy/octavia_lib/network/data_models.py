@@ -12,7 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from octavia.common import data_models
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import data_models
 
 
 class Interface(data_models.BaseDataModel):
