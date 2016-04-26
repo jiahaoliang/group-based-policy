@@ -229,12 +229,19 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         kwargs = kwargs['kwargs']
         rpcClient = transport.RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
-            version=const.LOADBALANCERV_RPC_API_VERSION)
+            version=const.LOADBALANCERV2_RPC_API_VERSION)
 
         lb_p_status = const.ACTIVE
         lb_o_status = None
         obj_p_status = kwargs['provisioning_status']
         obj_o_status = kwargs['operating_status']
+
+        msg = ("NCO received LB's update_status API, making an update_status "
+               "RPC call to plugin for %s: %s with status %s" % (
+                   kwargs['obj_type'], kwargs['obj_id'],
+                   obj_p_status))
+        LOG.info(msg)
+
         if kwargs['obj_type'] == 'healthmonitor':
                 obj_o_status = None
 
@@ -244,12 +251,11 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
                                  obj_id=kwargs['obj_id'],
                                  provisioning_status=obj_p_status,
                                  operating_status=obj_o_status)
-
-            msg = ("NCO received LB's update_status API, making an update_status "
-                   "RPC call to plugin for %s: %s with status %s" % (
-                       kwargs['obj_type'], kwargs['obj_id'],
-                       obj_p_status))
-            LOG.info(msg)
+        else:
+            lb_o_status = const.ONLINE
+            if obj_p_status == const.ERROR:
+                lb_p_status = const.ERROR
+                lb_o_status = const.OFFLINE
 
         rpcClient.cctxt.cast(context, 'update_status',
                              obj_type='loadbalancer',
