@@ -90,7 +90,7 @@ class NotificationHandler(object):
     def _update_status_lbv2(self, **kwargs):
         rpcClient = RPCClient(a_topics.LBV2_NFP_CONFIGAGENT_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
-            version=const.LOADBALANCER_RPC_API_VERSION)
+            version=const.LOADBALANCERV2_RPC_API_VERSION)
         context = kwargs.get('context')
         rpc_ctx = n_context.Context.from_dict(context)
         del kwargs['context']

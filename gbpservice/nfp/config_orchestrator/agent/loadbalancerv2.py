@@ -229,7 +229,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         kwargs = kwargs['kwargs']
         rpcClient = transport.RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
-            version=const.LOADBALANCER_RPC_API_VERSION)
+            version=const.LOADBALANCERV2_RPC_API_VERSION)
         msg = ("NCO received LB's update_status API, making an update_status "
                "RPC call to plugin for %s: %s with status %s" % (
                    kwargs['obj_type'], kwargs['obj_id'],
