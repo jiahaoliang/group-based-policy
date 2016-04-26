@@ -12,7 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import octavia.common.data_models as models
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    common import data_models as models
 
 
 class Topology(models.BaseDataModel):
