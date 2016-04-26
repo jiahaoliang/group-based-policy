@@ -229,12 +229,8 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         kwargs = kwargs['kwargs']
         rpcClient = transport.RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
-            version=const.LOADBALANCERV2_RPC_API_VERSION)
-        msg = ("NCO received LB's update_status API, making an update_status "
-               "RPC call to plugin for %s: %s with status %s" % (
-                   kwargs['obj_type'], kwargs['obj_id'],
-                   kwargs['status']))
-        LOG.info(msg)
+            version=const.LOADBALANCERV_RPC_API_VERSION)
+
         lb_p_status = const.ACTIVE
         lb_o_status = None
         obj_p_status = kwargs['provisioning_status']
@@ -249,11 +245,17 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
                                  provisioning_status=obj_p_status,
                                  operating_status=obj_o_status)
 
+            msg = ("NCO received LB's update_status API, making an update_status "
+                   "RPC call to plugin for %s: %s with status %s" % (
+                       kwargs['obj_type'], kwargs['obj_id'],
+                       obj_p_status))
+            LOG.info(msg)
+
         rpcClient.cctxt.cast(context, 'update_status',
                              obj_type='loadbalancer',
                              obj_id=kwargs['root_lb_id'],
                              provisioning_status=lb_p_status,
-                             operating_status=lb_o_status)
+                             operating_status=lb_o_status
 
         # TODO(jiahao): copy from v1 agent need to review
         # if kwargs['obj_type'] == 'vip':
