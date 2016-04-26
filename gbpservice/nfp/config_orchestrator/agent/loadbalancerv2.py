@@ -255,7 +255,7 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
                              obj_type='loadbalancer',
                              obj_id=kwargs['root_lb_id'],
                              provisioning_status=lb_p_status,
-                             operating_status=lb_o_status
+                             operating_status=lb_o_status)
 
         # TODO(jiahao): copy from v1 agent need to review
         # if kwargs['obj_type'] == 'vip':
