@@ -36,12 +36,11 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
 
 # Assume orchestrator already created this amphora
 # TODO: This part need to be removed once the ochestartor part is done
-AMP = o_data_models.Amphora(
-    lb_network_ip = "11.0.0.4",
-    id = "121daa13-d64b-4aae-ba4c-6aa001971ed7",
-    status = constants.ACTIVE,
-    compute_id = "a12acb28-4ff0-438e-9d1e-e3a825eb9fc0"
-)
+# AMP = o_data_models.Amphora(
+#     lb_network_ip = "11.0.0.4",
+#     id = "121daa13-d64b-4aae-ba4c-6aa001971ed7",
+#     status = constants.ACTIVE
+# )
 
 DRIVER_NAME = 'loadbalancerv2'
 
@@ -251,6 +250,10 @@ class OctaviaDataModelBuilder(object):
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
+    # TODO(jiahao): store the amphorae info locally, need to remove later
+    # amphorae = {"loadbalancer_id": [o_data_models.Amphora(
+    #                                 lb_network_ip, id, status)]}
+    amphorae = {}
 
     def __init__(self, plugin=None):
         super(HaproxyLoadBalancerDriver, self).__init__(plugin)
@@ -274,7 +277,13 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
 
     # Get Amphora object given the loadbalancer_id
     def get_amphora(self, loadbalancer_id):
-        return [AMP]
+        return self.amphorae.get(loadbalancer_id)
+
+    def add_amphora(self, loadbalancer_id,
+                    lb_network_ip, amp_id, status=constants.ACTIVE):
+        if not self.get_amphora(loadbalancer_id):
+            amp = o_data_models.Amphora(lb_network_ip, amp_id, status)
+            self.amphorae[loadbalancer_id] = [amp]
 
     def configure_healthmonitor(self, context, kwargs):
         """Overriding BaseDriver's configure_healthmonitor().
@@ -342,17 +351,18 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                         "VIP port information is not found")
 
                 # Get vrrp_port
-                vrrp_port = None
-                for port_dict in context['service_info']['ports']:
-                    if port_dict['device_id'] == amp.compute_id:
-                        for fix_ip in port_dict['fixed_ips']:
-                            if fix_ip['subnet_id'] == \
-                                    loadbalancer_n_obj.vip_subnet_id:
-                                vrrp_port = n_data_models.Port.from_dict(
-                                    copy.deepcopy(port_dict))
-                                break
-                        if vrrp_port is not None:
-                            break
+                # vrrp_port = None
+                # for port_dict in context['service_info']['ports']:
+                #     if port_dict['device_id'] == amp.compute_id:
+                #         for fix_ip in port_dict['fixed_ips']:
+                #             if fix_ip['subnet_id'] == \
+                #                     loadbalancer_n_obj.vip_subnet_id:
+                #                 vrrp_port = n_data_models.Port.from_dict(
+                #                     copy.deepcopy(port_dict))
+                #                 break
+                #         if vrrp_port is not None:
+                #             break
+                vrrp_port = copy.deepcopy(vip_port)
                 if vrrp_port is None:
                     raise exceptions.IncompleteData(
                         "VRRP port information is not found")
@@ -371,6 +381,11 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
 
+        # TODO(jiahao): use network_function_id as amphora id
+        sc_metadata = loadbalancer['description']
+        self.driver.add_amphora(loadbalancer['id'],
+                                sc_metadata['floating_ip'],
+                                sc_metadata['network_function_id'])
         loadbalancer_o_obj = self.driver.o_models_builder.\
             get_loadbalancer_octavia_model(loadbalancer)
         amphorae_network_config = self._get_amphorae_network_config(
