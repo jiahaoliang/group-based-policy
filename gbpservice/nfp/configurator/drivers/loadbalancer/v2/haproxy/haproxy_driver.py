@@ -15,6 +15,7 @@
 import sys
 import pdb
 import copy
+import ast
 from oslo_log import log as logging
 
 from neutron_lbaas.drivers import driver_base as n_driver_base
@@ -382,7 +383,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
 
         # TODO(jiahao): use network_function_id as amphora id
-        sc_metadata = loadbalancer['description']
+        sc_metadata = ast.literal_eval(loadbalancer['description'])
         self.driver.add_amphora(loadbalancer['id'],
                                 sc_metadata['floating_ip'],
                                 sc_metadata['network_function_id'])
