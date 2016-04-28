@@ -368,7 +368,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                 sc_metadata = ast.literal_eval(
                     loadbalancer_dict['description'])
                 vrrp_port = n_data_models.Port(
-                    mac_address=sc_metadata.provider_interface_mac)
+                    mac_address=sc_metadata['provider_interface_mac'])
                 if vrrp_port is None:
                     raise exceptions.IncompleteData(
                         "VRRP port information is not found")
