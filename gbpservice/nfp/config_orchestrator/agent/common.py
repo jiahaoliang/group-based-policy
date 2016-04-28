@@ -58,8 +58,7 @@ def _filter_data(routers, networks, filters):
         for port in ports:
             if port['tenant_id'] == tenant_id:
                 _filtered_ports.append({'id': port['id'],
-                                        'fixed_ips': port['fixed_ips'],
-                                        'mac_address': port['mac_address']})
+                                        'fixed_ips': port['fixed_ips']})
 
     return {'subnets': _filtered_subnets,
             'routers': _filtered_routers,

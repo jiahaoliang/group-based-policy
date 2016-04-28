@@ -353,18 +353,19 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                     raise  exceptions.IncompleteData(
                         "VIP port information is not found")
 
-                # Get vrrp_port, vrrp_port is the port attached to haproxy VM
-                vrrp_port = None
-                for port_dict in context['service_info']['ports']:
-                    for fix_ip in port_dict['fixed_ips']:
-                        if (fix_ip['ip_address'] == amp.lb_network_ip and
-                                fix_ip['subnet_id'] ==
-                                loadbalancer_n_obj.vip_subnet_id):
-                            vrrp_port = n_data_models.Port.from_dict(
-                                copy.deepcopy(port_dict))
-                            break
-                    if vrrp_port is not None:
-                        break
+                # Get vrrp_port
+                # vrrp_port = None
+                # for port_dict in context['service_info']['ports']:
+                #     if port_dict['device_id'] == amp.compute_id:
+                #         for fix_ip in port_dict['fixed_ips']:
+                #             if fix_ip['subnet_id'] == \
+                #                     loadbalancer_n_obj.vip_subnet_id:
+                #                 vrrp_port = n_data_models.Port.from_dict(
+                #                     copy.deepcopy(port_dict))
+                #                 break
+                #         if vrrp_port is not None:
+                #             break
+                vrrp_port = copy.deepcopy(vip_port)
                 if vrrp_port is None:
                     raise exceptions.IncompleteData(
                         "VRRP port information is not found")
