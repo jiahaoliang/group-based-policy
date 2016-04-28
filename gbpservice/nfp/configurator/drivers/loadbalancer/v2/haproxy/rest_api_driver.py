@@ -64,7 +64,7 @@ haproxy_amphora_opts = [
                help=_('Base directory for cert storage.')),
     cfg.StrOpt('haproxy_template', help=_('Custom haproxy template.')),
     cfg.IntOpt('connection_max_retries',
-               default=300,
+               default=10,
                help=_('Retry threshold for connecting to amphorae.')),
     cfg.IntOpt('connection_retry_interval',
                default=5,

@@ -283,7 +283,9 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     def add_amphora(self, loadbalancer_id,
                     lb_network_ip, amp_id, status=constants.ACTIVE):
         if not self.get_amphora(loadbalancer_id):
-            amp = o_data_models.Amphora(lb_network_ip, amp_id, status)
+            amp = o_data_models.Amphora(lb_network_ip=lb_network_ip,
+                                        id=amp_id,
+                                        status=status)
             self.amphorae[loadbalancer_id] = [amp]
 
     def configure_healthmonitor(self, context, kwargs):
