@@ -197,7 +197,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         if context.is_admin:
             tenant_id = context.tenant_id
         filters = {'tenant_id': [tenant_id]}
-        db = self._get_lb_context(context, filters)
+        # TODO(jiahao): don't need _get_lb_context() for now
+        # db = self._get_lb_context(context, filters)
+        db = {}
         db.update(self._get_core_context(context, filters))
         return db
 
