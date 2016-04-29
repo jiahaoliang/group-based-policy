@@ -54,7 +54,9 @@ def _filter_data(routers, networks, filters):
         ports = network['ports']
         for subnet in subnets:
             if subnet['tenant_id'] == tenant_id:
-                _filtered_subnets.append({'id': subnet['id']})
+                _filtered_subnets.append({'id': subnet['id'],
+                                          'cidr': subnet['cidr'],
+                                          'gateway_ip': subnet['gateway_ip']})
         for port in ports:
             if port['tenant_id'] == tenant_id:
                 _filtered_ports.append({'id': port['id'],
