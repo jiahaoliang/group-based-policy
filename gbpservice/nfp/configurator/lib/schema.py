@@ -39,7 +39,7 @@ skip_kwargs_validation_for = [
                                 'vpn',
                                 'loadbalancer',
                                 'loadbalancerv2',
-                                'config_script'
+                                'nfp_service'
                              ]
 
 
@@ -55,7 +55,9 @@ request_data = {'info': {},
     This is a key of request data which also needs to be validated.
 """
 
-request_data_info = {'version': ""}
+request_data_info = {'context': "",
+                     'service_type': "",
+                     'service_vendor': ""}
 
 
 """ Request data config schema.
@@ -63,7 +65,7 @@ request_data_info = {'version': ""}
 """
 
 request_data_config = {'resource': "",
-                       'kwargs': ""
+                       'resource_data': ""
                        }
 
 
@@ -72,38 +74,16 @@ request_data_config = {'resource': "",
    service vm is launched successfully.
 """
 
-interfaces = {'context': {},
-              'request_info': {},
-              'vm_mgmt_ip': "",
-              'service_vendor': "",
+interfaces = {'mgmt_ip': "",
               'provider_ip': "",
               'provider_cidr': "",
-              'provider_interface_position': "",
+              'provider_interface_index': "",
               'stitching_ip': "",
               'stitching_cidr': "",
-              'stitching_interface_position': "",
+              'stitching_interface_index': "",
               'provider_mac': "",
-              'stitching_mac': "",
-              'rule_info': {'active_provider_mac': "",
-                            'active_stitching_mac': "",
-                            'active_fip': "",
-                            'service_id': "",
-                            'tenant_id': ""
-                            },
-              'service_type': ""
+              'stitching_mac': ""
               }
-
-
-""" Interfaces rule info schema.
-    This comes as one of the key in kwargs of interface resource.
-"""
-
-interfaces_rule_info = {'active_provider_mac': "",
-                        'active_stitching_mac': "",
-                        'active_fip': "",
-                        'service_id': "",
-                        'tenant_id': ""
-                        }
 
 
 """Routes resource schema.
@@ -111,15 +91,11 @@ interfaces_rule_info = {'active_provider_mac': "",
    vm is launched successfully.
 """
 
-routes = {'context': {},
-          'request_info': {},
-          'vm_mgmt_ip': "",
-          'service_vendor': "",
+routes = {'mgmt_ip': "",
           'source_cidrs': "",
           'destination_cidr': "",
           'gateway_ip': "",
-          'provider_interface_position': "",
-          'service_type': "",
+          'provider_interface_index': "",
           }
 
 
@@ -128,10 +104,7 @@ routes = {'context': {},
    service vm is launched successfully.
 """
 
-healthmonitor = {'context': {},
-                 'request_info': {},
-                 'service_type': "",
-                 'vmid': "",
+healthmonitor = {'vmid': "",
                  'mgmt_ip': "",
                  'periodicity': "",
                  }

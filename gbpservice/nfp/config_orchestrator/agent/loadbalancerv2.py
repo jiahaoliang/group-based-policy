@@ -12,16 +12,23 @@
 
 import pdb
 import sys
-from neutron_lbaas.db.loadbalancer import loadbalancer_dbv2
-from gbpservice.nfp.common import constants as const
-from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
-from gbpservice.nfp.config_orchestrator.agent import common
-from gbpservice.nfp.lib import transport
-from oslo_log import helpers as log_helpers
-import oslo_messaging as messaging
-from oslo_log import log
+import ast
+import copy
 
-LOG = log.getLogger(__name__)
+from gbpservice.nfp.common import constants as const
+from gbpservice.nfp.config_orchestrator.agent import common
+from gbpservice.nfp.config_orchestrator.agent import topics as a_topics
+from gbpservice.nfp.core import common as nfp_common
+from gbpservice.nfp.lib import transport
+
+from neutron_lbaas.db.loadbalancer import loadbalancer_dbv2
+
+from oslo_log import helpers as log_helpers
+from oslo_log import log as oslo_logging
+import oslo_messaging as messaging
+
+LOGGER = oslo_logging.getLogger(__name__)
+LOG = nfp_common.log
 
 # class ForkedPdb(pdb.Pdb):
 #     """A Pdb subclass that may be used
@@ -50,33 +57,94 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         self._sc = sc
         super(Lbv2Agent, self).__init__()
 
-    def _post(self, context, tenant_id, name, **kwargs):
+    def _filter_service_info_with_resource(self, db):
+        updated_db = {'subnets': [],
+                      'ports': []}
+        for lb in db['loadbalancers']:
+            lb_port_id = lb['vip_port_id']
+            lb_subnet_id = lb['vip_subnet_id']
+            for subnet in db['subnets']:
+                if subnet['id'] == lb_subnet_id:
+                    updated_db['subnets'].append(subnet)
+            for port in db['ports']:
+                if port['id'] == lb_port_id:
+                    updated_db['ports'].append(port)
+        db.update(updated_db)
+        return db
 
+    def _to_api_dict(self, objs):
+        ret_list = []
+        for obj in objs:
+            ret_list.append(obj.to_api_dict())
+        return ret_list
+
+    def _get_core_context(self, context, filters):
+        core_context_dict = common.get_core_context(context,
+                                                    filters,
+                                                    self._conf.host)
+        del core_context_dict['routers']
+        return core_context_dict
+
+    def _get_lb_context(self, context, filters):
+        args = {'context': context, 'filters': filters}
+        db_data = super(Lbv2Agent, self)
+        return {'loadbalancers': self._to_api_dict(db_data.get_loadbalancers(**args)),
+                'listeners': self._to_api_dict(db_data.get_listeners(**args)),
+                'pools': self._to_api_dict(db_data.get_pools(**args)),
+                'pool_members': self._to_api_dict(db_data.get_pool_members(**args)),
+                'healthmonitors': self._to_api_dict(db_data.get_healthmonitors(**args))}
+
+    def _context(self, context, tenant_id):
+        if context.is_admin:
+            tenant_id = context.tenant_id
+        filters = {'tenant_id': [tenant_id]}
+        # TODO(jiahao): _get_lb_context() fails for flavor_id
+        db = self._get_lb_context(context, filters)
+        db.update(self._get_core_context(context, filters))
+        return db
+
+    def _prepare_resource_context_dicts(self, context, tenant_id):
+        # Prepare context_dict
+        ctx_dict = context.to_dict()
         # Collecting db entry required by configurator.
-        db = self._context(context, tenant_id)
         # Addind service_info to neutron context and sending
         # dictionary format to the configurator.
-        context_dict = context.to_dict()
-        context_dict.update({'service_info': db})
-        kwargs.update({'context': context_dict})
-        body = common.prepare_request_data(name, kwargs, "loadbalancerv2")
+        db = self._context(context, tenant_id)
+        rsrc_ctx_dict = copy.deepcopy(ctx_dict)
+        db = self._filter_service_info_with_resource(db)
+        rsrc_ctx_dict.update({'service_info': db})
+        return ctx_dict, rsrc_ctx_dict
+
+    def _data_wrapper(self, context, tenant_id, name, reason, **kwargs):
+        ctx_dict, rsrc_ctx_dict = self.\
+            _prepare_resource_context_dicts(context, tenant_id)
+        nfp_context = {'neutron_context': ctx_dict,
+                       'requester': 'nas_service'}
+        if name.lower() == 'loadbalancer':
+            vip_desc = ast.literal_eval(kwargs['loadbalancer']['description'])
+            nf_id = vip_desc['network_function_id']
+            lb_id = kwargs['loadbalancer']['id']
+            nfp_context.update({'network_function_id': nf_id,
+                                'loadbalancer': lb_id})
+        resource_type = 'loadbalancerv2'
+        resource = name
+        resource_data = {'neutron_context': rsrc_ctx_dict}
+        resource_data.update(**kwargs)
+        body = common.prepare_request_data(nfp_context, resource,
+                                           resource_type, resource_data)
+        return body
+
+    def _post(self, context, tenant_id, name, **kwargs):
+        body = self._data_wrapper(context, tenant_id, name,
+                                  'CREATE', **kwargs)
         transport.send_request_to_configurator(self._conf,
-                                               context, body,
-                                               "CREATE")
+                                               context, body, "CREATE")
 
     def _delete(self, context, tenant_id, name, **kwargs):
-
-        # Collecting db entry required by configurator.
-        db = self._context(context, tenant_id)
-        # Addind service_info to neutron context and sending
-        # dictionary format to the configurator.
-        context_dict = context.to_dict()
-        context_dict.update({'service_info': db})
-        kwargs.update({'context': context_dict})
-        body = common.prepare_request_data(name, kwargs, "loadbalancerv2")
+        body = self._data_wrapper(context, tenant_id, name,
+                                  'DELETE', **kwargs)
         transport.send_request_to_configurator(self._conf,
-                                               context, body,
-                                               "DELETE")
+                                               context, body, "DELETE")
 
     #TODO(jiahao): Argument allocate_vip and delete_vip_port are not implememnted.
     @log_helpers.log_method_call
@@ -178,79 +246,68 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
     #             'l7policies': db_data.get_l7policies(**args),
     #             'l7policy_rules': db_data.get_l7policy_rules(**args)}
 
-    def _to_api_dict(self, objs):
-        ret_list = []
-        for obj in objs:
-            ret_list.append(obj.to_api_dict())
-        return ret_list
 
-    def _get_lb_context(self, context, filters):
-        args = {'context': context, 'filters': filters}
-        db_data = super(Lbv2Agent, self)
-        return {'loadbalancers': self._to_api_dict(db_data.get_loadbalancers(**args)),
-                'listeners': self._to_api_dict(db_data.get_listeners(**args)),
-                'pools': self._to_api_dict(db_data.get_pools(**args)),
-                'pool_members': self._to_api_dict(db_data.get_pool_members(**args)),
-                'healthmonitors': self._to_api_dict(db_data.get_healthmonitors(**args))}
+class LoadbalancerV2Notifier(object):
 
-    def _context(self, context, tenant_id):
-        if context.is_admin:
-            tenant_id = context.tenant_id
-        filters = {'tenant_id': [tenant_id]}
-        # TODO(jiahao): don't need _get_lb_context() for now
-        # db = self._get_lb_context(context, filters)
-        db = {}
-        db.update(self._get_core_context(context, filters))
-        return db
-
-    def _get_core_context(self, context, filters):
-        core_context_dict = common.get_core_context(context,
-                                                    filters,
-                                                    self._conf.host)
-        del core_context_dict['routers']
-        return core_context_dict
+    def __init__(self, conf, sc):
+        self._sc = sc
+        self._conf = conf
 
     # TODO(jiahao): copy from v1 agent need to review
-    # def _prepare_request_data(self, context, vip):
-    #     request_data = None
-    #     try:
-    #         if vip is not None:
-    #             vip_desc = ast.literal_eval(vip['description'])
-    #             request_data = common.get_network_function_map(
-    #                 context, vip_desc['network_function_id'])
-    #             # Adding Service Type #
-    #             request_data.update({"service_type": "loadbalancer",
-    #                                  "vip_id": vip['id']})
-    #     except Exception as e:
-    #         LOG.error(e)
-    #         return request_data
-    #     return request_data
+    def _prepare_request_data(self, context, nf_id, lb_id, service_type):
+        request_data = None
+        try:
+            request_data = common.get_network_function_map(
+                context, nf_id)
+            # Adding Service Type #
+            # TODO(jiahao): is the key name "loadbalancer_id" correct?
+            request_data.update({"service_type": service_type,
+                                 "loadbalancer_id": lb_id})
+        except Exception:
+            return request_data
+        return request_data
 
-    @log_helpers.log_method_call
-    def update_status(self, context, **kwargs):
-        kwargs = kwargs['kwargs']
+    # TODO(jiahao): copy from v1 agent need to review
+    def _trigger_service_event(self, context, event_type, event_id,
+                               request_data):
+        event_data = {'resource': None,
+                      'context': context}
+        event_data['resource'] = {'eventtype': event_type,
+                                  'eventid': event_id,
+                                  'eventdata': request_data}
+        ev = self._sc.new_event(id=event_id,
+                                key=event_id, data=event_data)
+        self._sc.post_event(ev)
+
+    def update_status(self, context, notification_data):
+        notification = notification_data['notification'][0]
+        notification_info = notification_data['info']
+        resource_data = notification['data']
+        obj_type = resource_data['obj_type']
+        obj_id = resource_data['obj_id']
+        service_type = notification_info['service_type']
+
         rpcClient = transport.RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
             version=const.LOADBALANCERV2_RPC_API_VERSION)
 
         lb_p_status = const.ACTIVE
         lb_o_status = None
-        obj_p_status = kwargs['provisioning_status']
-        obj_o_status = kwargs['operating_status']
+        obj_p_status = resource_data['provisioning_status']
+        obj_o_status = resource_data['operating_status']
 
         msg = ("NCO received LB's update_status API, making an update_status "
                "RPC call to plugin for %s: %s with status %s" % (
-                   kwargs['obj_type'], kwargs['obj_id'],
-                   obj_p_status))
+                   obj_type, obj_id, obj_p_status))
         LOG.info(msg)
 
-        if kwargs['obj_type'] == 'healthmonitor':
+        if obj_type == 'healthmonitor':
                 obj_o_status = None
 
-        if kwargs['obj_type'] != 'loadbalancer':
+        if obj_type != 'loadbalancer':
             rpcClient.cctxt.cast(context, 'update_status',
-                                 obj_type=kwargs['obj_type'],
-                                 obj_id=kwargs['obj_id'],
+                                 obj_type=obj_type,
+                                 obj_id=obj_id,
                                  provisioning_status=obj_p_status,
                                  operating_status=obj_o_status)
         else:
@@ -261,54 +318,53 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
         rpcClient.cctxt.cast(context, 'update_status',
                              obj_type='loadbalancer',
-                             obj_id=kwargs['root_lb_id'],
+                             obj_id=resource_data['root_lb_id'],
                              provisioning_status=lb_p_status,
                              operating_status=lb_o_status)
 
-        # TODO(jiahao): copy from v1 agent need to review
-        # if kwargs['obj_type'] == 'vip':
-        #     vip = kwargs['vip']
-        #     request_data = self._prepare_request_data(context, vip)
-        #     LOG.info("%s : %s " % (request_data, vip))
-        #     # Sending An Event for visiblity #
-        #     data = {'resource': None,
-        #             'context': context}
-        #     data['resource'] = {'eventtype': 'SERVICE',
-        #                         'eventid': 'SERVICE_CREATED',
-        #                         'eventdata': request_data}
-        #     ev = self._sc.new_event(id='SERVICE_CREATE',
-        #                             key='SERVICE_CREATE', data=data)
-        #     self._sc.post_event(ev)
+        # TODO(jiahao): how to get lb_id?
+        if obj_type.lower() == 'loadbalancer':
+            nf_id = notification_info['context']['network_function_id']
+            lb_id = notification_info['context']['loadbalancer_id']
+            request_data = self._prepare_request_data(context, nf_id,
+                                                      lb_id, service_type)
+            LOG(LOGGER, 'INFO', "%s : %s " % (request_data, nf_id))
+
+            # Sending An Event for visiblity
+            self._trigger_service_event(context, 'SERVICE', 'SERVICE_CREATED',
+                                        request_data)
 
     # TODO(jiahao): copy from v1 agent need to review
-    # @log_helpers.log_method_call
-    # def update_pool_stats(self, context, **kwargs):
-    #     kwargs = kwargs['kwargs']
+    # def update_pool_stats(self, context, notification_data):
+    #     notification = notification_data['notification'][0]
+    #     resource_data = notification['data']
+    #     pool_id = resource_data['pool_id']
+    #     stats = resource_data['stats']
+    #     host = resource_data['host']
+    #
+    #     msg = ("NCO received LB's update_pool_stats API, making an "
+    #            "update_pool_stats RPC call to plugin for updating"
+    #            "pool: %s stats" % (pool_id))
+    #     LOG(LOGGER, 'INFO', '%s' % (msg))
+    #
+    #     # RPC call to plugin to update stats of pool
     #     rpcClient = transport.RPCClient(a_topics.LB_NFP_PLUGIN_TOPIC)
     #     rpcClient.cctxt = rpcClient.client.prepare(
     #         version=const.LOADBALANCER_RPC_API_VERSION)
-    #     msg = ("NCO received LB's update_pool_stats API, making an "
-    #            "update_pool_stats RPC call to plugin for updating"
-    #            "pool: %s stats" % (kwargs['obj_id']))
-    #     LOG.info(msg)
     #     rpcClient.cctxt.cast(context, 'update_pool_stats',
-    #                          pool_id=kwargs['pool_id'],
-    #                          stats=kwargs['stats'],
-    #                          host=kwargs['host'])
+    #                          pool_id=pool_id,
+    #                          stats=stats,
+    #                          host=host)
     #
-    # @log_helpers.log_method_call
-    # def vip_deleted(self, context, **kwargs):
-    #     LOG.info(kwargs)
-    #     kwargs = kwargs['kwargs']
-    #     vip = kwargs['vip']
-    #     request_data = self._prepare_request_data(context, vip)
-    #     LOG.info("%s : %s " % (request_data, vip))
-    #     # Sending An Event for visiblity #
-    #     data = {'resource': None,
-    #             'context': context}
-    #     data['resource'] = {'eventtype': 'SERVICE',
-    #                         'eventid': 'SERVICE_DELETED',
-    #                         'eventdata': request_data}
-    #     ev = self._sc.new_event(id='SERVICE_DELETE',
-    #                             key='SERVICE_DELETE', data=data)
-    #     self._sc.post_event(ev)
+    # def vip_deleted(self, context, notification_data):
+    #     notification_info = notification_data['info']
+    #     nf_id = notification_info['context']['network_function_id']
+    #     vip_id = notification_info['context']['vip_id']
+    #     service_type = notification_info['service_type']
+    #     request_data = self._prepare_request_data(context, nf_id,
+    #                                               vip_id, service_type)
+    #     LOG(LOGGER, 'INFO', "%s : %s " % (request_data, nf_id))
+    #
+    #     # Sending An Event for visiblity
+    #     self._trigger_service_event(context, 'SERVICE', 'SERVICE_DELETED',
+    #                                 request_data)

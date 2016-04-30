@@ -251,6 +251,7 @@ class OctaviaDataModelBuilder(object):
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
+    service_vendor = 'haproxy_lbaasv2'
     # TODO(jiahao): store the amphorae info locally, need to remove later
     # amphorae = {"loadbalancer_id": [o_data_models.Amphora(
     #                                 lb_network_ip, id, status)]}

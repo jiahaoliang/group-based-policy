@@ -53,8 +53,9 @@ class LBaasRpcSender(data_filter.Filter):
             )
         )
 
-    def update_status(self, context, obj_type, obj_id, root_lb_id,
-                      provisioning_status, operating_status):
+    def update_status(self, obj_type, obj_id, root_lb_id,
+                      provisioning_status, operating_status,
+                      agent_info, obj=None):
         """ Enqueues the response from LBaaS operation to neutron plugin.
 
         :param obj_type: object type
@@ -66,37 +67,43 @@ class LBaasRpcSender(data_filter.Filter):
         (‘ONLINE’, ‘OFFLINE’, ‘DEGRADED’, ‘ERROR’)
 
         """
-        msg = {'receiver': lb_constants.NEUTRON,
-               'resource': lb_constants.SERVICE_TYPE,
-               'method': 'update_status',
-               'kwargs': {'context': context,
-                          'obj_type': obj_type,
-                          'obj_id': obj_id,
-                          'root_lb_id': root_lb_id,
-                          'provisioning_status': provisioning_status,
-                          'operating_status': operating_status}
+
+        msg = {'info': {'service_type': lb_constants.SERVICE_TYPE,
+                        'context': agent_info['context']},
+               'notification': [{'resource': agent_info['resource'],
+                                 'data':{'obj_type': obj_type,
+                                         'obj_id': obj_id,
+                                         'notification_type': 'update_status',
+                                         'root_lb_id': root_lb_id,
+                                         'provisioning_status':
+                                             provisioning_status,
+                                         'operating_status':
+                                             operating_status,
+                                         obj_type: obj}}]
                }
         self.notify._notification(msg)
 
     # TODO(jiahao): copy from v1 agent need to review
-    def update_pool_stats(self, pool_id, stats):
+    def update_pool_stats(self, pool_id, stats, context, pool=None):
         """ Enqueues the response from LBaaS operation to neutron plugin.
 
         :param pool_id: pool id
         :param stats: statistics of that pool
 
         """
-        msg = {'receiver': lb_constants.NEUTRON,
-               'resource': lb_constants.SERVICE_TYPE,
-               'method': 'update_pool_stats',
-               'kwargs': {'pool_id': pool_id,
-                          'stats': stats}
+        msg = {'info': {'service_type': lb_constants.SERVICE_TYPE,
+                        'context': context.to_dict()},
+               'notification': [{'resource': 'pool',
+                                 'data': {'pool_id': pool_id,
+                                          'stats': stats,
+                                          'notification_type': (
+                                                        'update_pool_stats'),
+                                          'pool': pool_id}}]
                }
-        LOG.info("sending update pool stats notification %s " % (msg))
         self.notify._notification(msg)
 
     # TODO(jiahao): copy from v1 agent need to review
-    def vip_deleted(self, vip, status, context):
+    def vip_deleted(self, vip, status, agent_info):
         """ Enqueues the response from LBaaS operation to neutron plugin.
 
         :param vip: object type
@@ -104,13 +111,13 @@ class LBaasRpcSender(data_filter.Filter):
         :param status: status of the object to be set
 
         """
-        msg = {'receiver': lb_constants.NEUTRON,
-               'resource': lb_constants.SERVICE_TYPE,
-               'method': 'vip_deleted',
-               'kwargs': {'context': context,
-                          'vip_id': vip['id'],
-                          'vip': vip,
-                          'status': status}
+        msg = {'info': {'service_type': lb_constants.SERVICE_TYPE,
+                        'context': agent_info['context']},
+               'notification': [{'resource': agent_info['resource'],
+                                 'data': {'vip_id': vip['id'],
+                                          'vip': vip,
+                                          'notification_type': 'vip_deleted',
+                                          'status': status}}]
                }
         self.notify._notification(msg)
 
@@ -462,7 +469,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         self.rpcmgr = rpcmgr
         self.plugin_rpc = LBaasRpcSender(sc)
 
-    def _get_driver(self, driver_name=lb_constants.SERVICE_TYPE):
+    def _get_driver(self, driver_name):
         """Retrieves service driver object based on service type input.
 
         Currently, service drivers are identified with service type. Support
@@ -475,6 +482,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         Returns: Service driver instance
 
         """
+        driver = lb_constants.SERVICE_TYPE + driver_name
         return self.drivers[driver_name]
 
     def _root_loadbalancer_id(self, obj_type, obj_dict):
@@ -567,25 +575,32 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         context = data['context']
         loadbalancer = data['loadbalancer']
         root_lb_id = self._root_loadbalancer_id('loadbalancer', loadbalancer)
-        driver = self._get_driver()
+        agent_info = ev.data['context'].pop('agent_info')
+        service_vendor = agent_info['service_vendor']
 
         try:
             if operation == 'create':
                 driver_name = data['driver_name']
-                if driver_name not in self.drivers:
-                    LOG.error('No device driver on agent: %s.', driver_name)
+                driver_id = driver_name + service_vendor
+                if (driver_id) not in self.drivers.keys():
+                    msg = ('No device driver on agent: %s.' % (driver_name))
+                    LOG.error(msg)
                     self.plugin_rpc.update_status(
-                        context, 'loadbalancer', loadbalancer['id'],
-                        root_lb_id, lb_constants.ERROR, lb_constants.OFFLINE)
+                        'loadbalancer', loadbalancer['id'], root_lb_id,
+                        lb_constants.ERROR, lb_constants.OFFLINE, agent_info,
+                        loadbalancer)
                     return
+                driver = self.drivers[driver_id]
                 driver.load_balancer.create(context, loadbalancer) 
                 LBaaSEventHandler.instance_mapping[loadbalancer['id']] \
                     = driver_name
             elif operation == 'update':
                 old_loadbalancer = data['old_loadbalancer']
+                driver = self._get_driver(service_vendor)
                 driver.load_balancer.update(context, 
                     old_loadbalancer, loadbalancer)
             elif operation == 'delete':
+                driver = self._get_driver(service_vendor)
                 driver.load_balancer.delete(context, loadbalancer)
                 del LBaaSEventHandler.instance_mapping[loadbalancer['id']]
                 return  # Don't update object status for delete operation
@@ -596,12 +611,14 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 del LBaaSEventHandler.instance_mapping[loadbalancer['id']]
             else:
                 self.plugin_rpc.update_status(
-                    context, 'loadbalancer', loadbalancer['id'],
-                    root_lb_id, lb_constants.ERROR,  lb_constants.OFFLINE)
+                    'loadbalancer', loadbalancer['id'], root_lb_id,
+                    lb_constants.ERROR, lb_constants.OFFLINE,
+                    agent_info, loadbalancer)
         else:
             self.plugin_rpc.update_status(
-                context, 'loadbalancer', loadbalancer['id'],
-                root_lb_id, lb_constants.ACTIVE, lb_constants.ONLINE)
+                    'loadbalancer', loadbalancer['id'], root_lb_id,
+                    lb_constants.ACTIVE, lb_constants.ONLINE,
+                    agent_info, loadbalancer)
 
     def _create_loadbalancer(self, ev):
         self._handle_event_loadbalancer(ev, 'create')
@@ -616,8 +633,10 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         data = ev.data
         context = data['context']
         listener = data['listener']
-        driver = self._get_driver()  # listener['loadbalancer_id'])
         root_lb_id = self._root_loadbalancer_id('listener', listener)
+        agent_info = ev.data['context'].pop('agent_info')
+        service_vendor = agent_info['service_vendor']
+        driver = self._get_driver(service_vendor)
 
         try:
             if operation == 'create':
@@ -633,12 +652,14 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 LOG.warn("Failed to delete listener %s" % (listener['id']))
             else:
                 self.plugin_rpc.update_status(
-                    context, 'listener', listener['id'],
-                    root_lb_id, lb_constants.ERROR,  lb_constants.OFFLINE)
+                    'listener', listener['id'], root_lb_id,
+                    lb_constants.ERROR,  lb_constants.OFFLINE,
+                    agent_info, listener)
         else:
             self.plugin_rpc.update_status(
-                    context, 'listener', listener['id'],
-                    root_lb_id, lb_constants.ACTIVE,  lb_constants.ONLINE)
+                    'listener', listener['id'], root_lb_id,
+                    lb_constants.ACTIVE,  lb_constants.ONLINE,
+                    agent_info, listener)
 
     def _create_listener(self, ev):
         self._handle_event_listener(ev, 'create')
@@ -653,8 +674,10 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         data = ev.data
         context = data['context']
         pool = data['pool']
-        driver = self._get_driver()  # pool['listeners'][0]['id'])
         root_lb_id = self._root_loadbalancer_id('pool', pool)
+        agent_info = ev.data['context'].pop('agent_info')
+        service_vendor = agent_info['service_vendor']
+        driver = self._get_driver(service_vendor)
 
         try:
             if operation == 'create':
@@ -670,12 +693,14 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 LOG.warn("Failed to delete pool %s" % (pool['id']))
             else:
                 self.plugin_rpc.update_status(
-                    context, 'pool', pool['id'],
-                    root_lb_id, lb_constants.ERROR,  lb_constants.OFFLINE)
+                    'pool', pool['id'], root_lb_id,
+                    lb_constants.ERROR,  lb_constants.OFFLINE,
+                    agent_info, pool)
         else:
             self.plugin_rpc.update_status(
-                    context, 'pool', pool['id'],
-                    root_lb_id, lb_constants.ACTIVE,  lb_constants.ONLINE)
+                    'pool', pool['id'], root_lb_id,
+                    lb_constants.ACTIVE,  lb_constants.ONLINE,
+                    agent_info, pool)
 
     def _create_pool(self, ev):
         self._handle_event_pool(ev, 'create')
@@ -690,8 +715,10 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         data = ev.data
         context = data['context']
         member = data['member']
-        driver = self._get_driver()  # member['pool_id'])
         root_lb_id = self._root_loadbalancer_id('member', member)
+        agent_info = ev.data['context'].pop('agent_info')
+        service_vendor = agent_info['service_vendor']
+        driver = self._get_driver(service_vendor)  # member['pool_id'])
         try:
             if operation == 'create':
                 driver.member.create(context, member)
@@ -707,12 +734,14 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                     "Failed to delete member %s" % (member['id']))
             else:
                 self.plugin_rpc.update_status(
-                    context, 'member', member['id'],
-                    root_lb_id, lb_constants.ERROR,  lb_constants.OFFLINE)
+                    'member', member['id'], root_lb_id,
+                    lb_constants.ERROR,  lb_constants.OFFLINE,
+                    agent_info, member)
         else:
             self.plugin_rpc.update_status(
-                    context, 'member', member['id'],
-                    root_lb_id, lb_constants.ACTIVE,  lb_constants.ONLINE)
+                    'member', member['id'], root_lb_id,
+                    lb_constants.ACTIVE,  lb_constants.ONLINE,
+                    agent_info, member)
 
     def _create_member(self, ev):
         self._handle_event_member(ev, 'create')
@@ -730,7 +759,9 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         context = data['context']
         health_monitor = data['health_monitor']
         pool_id = data['pool_id']
-        driver = self._get_driver()  # (pool_id)
+        agent_info = context.pop('agent_info')
+        service_vendor = agent_info['service_vendor']
+        driver = self._get_driver(service_vendor)  # (pool_id)
         assoc_id = {'pool_id': pool_id,
                     'monitor_id': health_monitor['id']}
         try:
@@ -777,7 +808,8 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                               spacing=60)
     def collect_stats(self, ev):
         for pool_id, driver_name in LBaaSEventHandler.instance_mapping.items():
-            driver = self.drivers[driver_name]
+            driver_id = lb_constants.SERVICE_TYPE + driver_name
+            driver = self.drivers[driver_id]
             try:
                 stats = driver.get_stats(pool_id)
                 if stats:
@@ -786,7 +818,6 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
             except Exception:
                 msg = ("Error updating statistics on pool %s" % (pool_id))
                 LOG.error(msg)
-
 
 
 def events_init(sc, drivers, rpcmgr):
