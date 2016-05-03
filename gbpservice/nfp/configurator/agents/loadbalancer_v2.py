@@ -285,7 +285,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
         # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_CREATE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listener']['id'],
+                         binding_key=pool['loadbalancer_id'],
                          key=pool['id'])
 
     def update_pool(self, context, old_pool, pool):
@@ -306,7 +306,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
         # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_UPDATE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listener']['id'],
+                         binding_key=pool['loadbalancer_id'],
                          key=pool['id'])
 
     def delete_pool(self, context, pool):
@@ -325,7 +325,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
         # For Liberty, use binding_key=pool['listener']['id']
         self._send_event(lb_constants.EVENT_DELETE_POOL, arg_dict,
                          serialize=True,
-                         binding_key=pool['listener']['id'],
+                         binding_key=pool['loadbalancer_id'],
                          key=pool['id'])
 
     def create_member(self, context, member):
@@ -341,7 +341,8 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'member': member,
                     }
         self._send_event(lb_constants.EVENT_CREATE_MEMBER, arg_dict,
-                         serialize=True, binding_key=member['pool_id'],
+                         serialize=True,
+                         binding_key=member['pool']['loadbalancer_id'],
                          key=member['id'])
 
     def update_member(self, context, old_member, member):
@@ -359,7 +360,8 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'member': member,
                     }
         self._send_event(lb_constants.EVENT_UPDATE_MEMBER, arg_dict,
-                         serialize=True, binding_key=member['pool_id'],
+                         serialize=True,
+                         binding_key=member['pool']['loadbalancer_id'],
                          key=member['id'])
 
     def delete_member(self, context, member):
@@ -375,10 +377,11 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                     'member': member,
                     }
         self._send_event(lb_constants.EVENT_DELETE_MEMBER, arg_dict,
-                         serialize=True, binding_key=member['pool_id'],
+                         serialize=True,
+                         binding_key=member['pool']['loadbalancer_id'],
                          key=member['id'])
 
-    def create_health_monitor(self, context, health_monitor):
+    def create_healthmonitor(self, context, health_monitor):
         """Enqueues event for worker to process create health monitor request.
 
         :param context: RPC context
@@ -396,7 +399,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                          binding_key=health_monitor['pools'][0]['id'],
                          key=health_monitor['id'])
 
-    def update_health_monitor(self, context, old_health_monitor,
+    def update_healthmonitor(self, context, old_health_monitor,
                                    health_monitor):
         """Enqueues event for worker to process update health monitor request.
 
@@ -417,7 +420,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                          binding_key=health_monitor['pools'][0]['id'],
                          key=health_monitor['id'])
 
-    def delete_health_monitor(self, context, health_monitor):
+    def delete_healthmonitor(self, context, health_monitor):
         """Enqueues event for worker to process delete health monitor request.
 
         :param context: RPC context
@@ -483,7 +486,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
 
         """
         driver = lb_constants.SERVICE_TYPE + driver_name
-        return self.drivers[driver_name]
+        return self.drivers[driver]
 
     def _root_loadbalancer_id(self, obj_type, obj_dict):
         """Returns the loadbalancer id this instance is attached to."""
@@ -758,10 +761,13 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         data = ev.data
         context = data['context']
         health_monitor = data['health_monitor']
-        pool_id = data['pool_id']
+        root_lb_id = self._root_loadbalancer_id(
+            'healthmonitor', health_monitor)
         agent_info = context.pop('agent_info')
         service_vendor = agent_info['service_vendor']
         driver = self._get_driver(service_vendor)  # (pool_id)
+
+        pool_id = data['pool_id']
         assoc_id = {'pool_id': pool_id,
                     'monitor_id': health_monitor['id']}
         try:
@@ -780,10 +786,14 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                          " assoc_id: %s" % (assoc_id))
             else:
                 self.plugin_rpc.update_status(
-                    'healthmonitor', assoc_id, lb_constants.ERROR, context)
+                    'healthmonitor', health_monitor['id'], root_lb_id,
+                    lb_constants.ERROR,  lb_constants.OFFLINE,
+                    agent_info, health_monitor)
         else:
             self.plugin_rpc.update_status(
-                'healthmonitor', assoc_id, lb_constants.ACTIVE, context)
+                    'healthmonitor', health_monitor['id'], root_lb_id,
+                    lb_constants.ACTIVE,  lb_constants.ONLINE,
+                    agent_info, health_monitor)
 
     def _create_health_monitor(self, ev):
         self._handle_event_health_monitor(ev, 'create')

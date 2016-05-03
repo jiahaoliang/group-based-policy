@@ -299,7 +299,7 @@ class LoadbalancerV2Notifier(object):
         msg = ("NCO received LB's update_status API, making an update_status "
                "RPC call to plugin for %s: %s with status %s" % (
                    obj_type, obj_id, obj_p_status))
-        LOG.info(msg)
+        LOG(LOGGER, 'INFO', '%s' % (msg))
 
         if obj_type == 'healthmonitor':
                 obj_o_status = None
