@@ -325,7 +325,7 @@ class LoadbalancerV2Notifier(object):
         # TODO(jiahao): how to get lb_id?
         if obj_type.lower() == 'loadbalancer':
             nf_id = notification_info['context']['network_function_id']
-            lb_id = notification_info['context']['loadbalancer_id']
+            lb_id = notification_info['context']['loadbalancer']
             request_data = self._prepare_request_data(context, nf_id,
                                                       lb_id, service_type)
             LOG(LOGGER, 'INFO', "%s : %s " % (request_data, nf_id))
