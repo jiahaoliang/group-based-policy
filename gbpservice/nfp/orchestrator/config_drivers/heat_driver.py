@@ -416,6 +416,59 @@ class HeatDriver(object):
                 stack_template[resources_key][resource][
                     properties_key]['vip']['name'] += ptg_name
 
+    def _generate_lbv2_member_template(self, is_template_aws_version,
+                                     member_port, member_ip, stack_template):
+        type_key = 'Type' if is_template_aws_version else 'type'
+        properties_key = ('Properties' if is_template_aws_version
+                          else 'properties')
+        resources_key = 'Resources' if is_template_aws_version else 'resources'
+        res_key = 'Ref' if is_template_aws_version else 'get_resource'
+
+        lbaas_listener_key = self._get_heat_resource_key(
+            stack_template[resources_key],
+            is_template_aws_version,
+            "OS::Neutron::LBaaS::Listener")
+        listener_port = stack_template[resources_key][lbaas_listener_key][
+            properties_key]['protocol_port']
+        protocol_port = member_port if member_port else listener_port
+
+        lbaas_loadbalancer_key = self._get_heat_resource_key(
+            stack_template[resources_key],
+            is_template_aws_version,
+            "OS::Neutron::LBaaS::LoadBalancer")
+        subnet = stack_template[resources_key][lbaas_loadbalancer_key][
+            properties_key]['vip_subnet']
+
+        return {type_key: "OS::Neutron::LBaaS::PoolMember",
+                properties_key: {
+                "pool": {res_key: "pool"},
+                "address": member_ip,
+                "protocol_port": protocol_port,
+                "subnet": subnet,
+                "weight": 1}}
+
+    def _modify_lbv2_resources_name(self, stack_template, provider_ptg,
+                                    is_template_aws_version):
+        # TODO(jiahao): Don't know why we have to change resources name
+        pass
+
+    def _generate_lbaasv2_pool_members(self, auth_token, stack_template,
+                                       config_param_values, provider_ptg,
+                                       is_template_aws_version):
+        resources_key = 'Resources' if is_template_aws_version else 'resources'
+        self._modify_lbv2_resources_name(
+            stack_template, provider_ptg, is_template_aws_version)
+        member_ips = self._get_member_ips(auth_token, provider_ptg)
+        if not member_ips:
+            return
+        member_port = config_param_values['app_port']
+        for member_ip in member_ips:
+            member_name = 'mem-' + member_ip
+            stack_template[resources_key][member_name] = (
+                self._generate_lbv2_member_template(
+                    is_template_aws_version, member_port,
+                    member_ip, stack_template))
+
     def _generate_pool_members(self, auth_token, stack_template,
                                config_param_values, provider_ptg,
                                is_template_aws_version):
@@ -730,9 +783,14 @@ class HeatDriver(object):
 
         service_vendor = service_profile['service_flavor']
         if service_type in [pconst.LOADBALANCER, pconst.LOADBALANCERV2]:
-            self._generate_pool_members(
-                auth_token, stack_template, config_param_values,
-                provider, is_template_aws_version)
+            if service_type == pconst.LOADBALANCER:
+                self._generate_pool_members(
+                    auth_token, stack_template, config_param_values,
+                    provider, is_template_aws_version)
+            else:
+                self._generate_lbaasv2_pool_members(
+                    auth_token, stack_template, config_param_values,
+                    provider, is_template_aws_version)
             config_param_values['Subnet'] = provider_subnet['id']
             config_param_values['service_chain_metadata'] = ""
             if not base_mode_support:
