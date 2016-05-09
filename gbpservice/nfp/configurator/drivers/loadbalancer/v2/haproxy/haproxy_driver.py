@@ -235,7 +235,7 @@ class OctaviaDataModelBuilder(object):
             'ip_address': member.address,
             'protocol_port': member.protocol_port,
             'weight': member.weight,
-            'enable': member.admin_state_up,
+            'enabled': member.admin_state_up,
             'subnet_id': member.subnet_id,
             'operating_status': member.operating_status,
         }
