@@ -417,20 +417,12 @@ class HeatDriver(object):
                     properties_key]['vip']['name'] += ptg_name
 
     def _generate_lbv2_member_template(self, is_template_aws_version,
-                                     member_port, member_ip, stack_template):
+                                       member_ip, stack_template):
         type_key = 'Type' if is_template_aws_version else 'type'
         properties_key = ('Properties' if is_template_aws_version
                           else 'properties')
         resources_key = 'Resources' if is_template_aws_version else 'resources'
         res_key = 'Ref' if is_template_aws_version else 'get_resource'
-
-        lbaas_listener_key = self._get_heat_resource_key(
-            stack_template[resources_key],
-            is_template_aws_version,
-            "OS::Neutron::LBaaS::Listener")
-        listener_port = stack_template[resources_key][lbaas_listener_key][
-            properties_key]['protocol_port']
-        protocol_port = member_port if member_port else listener_port
 
         lbaas_loadbalancer_key = self._get_heat_resource_key(
             stack_template[resources_key],
@@ -443,7 +435,7 @@ class HeatDriver(object):
                 properties_key: {
                 "pool": {res_key: "pool"},
                 "address": member_ip,
-                "protocol_port": protocol_port,
+                "protocol_port": {"get_param": "app_port"},
                 "subnet": subnet,
                 "weight": 1}}
 
@@ -461,12 +453,11 @@ class HeatDriver(object):
         member_ips = self._get_member_ips(auth_token, provider_ptg)
         if not member_ips:
             return
-        member_port = config_param_values['app_port']
         for member_ip in member_ips:
             member_name = 'mem-' + member_ip
             stack_template[resources_key][member_name] = (
                 self._generate_lbv2_member_template(
-                    is_template_aws_version, member_port,
+                    is_template_aws_version,
                     member_ip, stack_template))
 
     def _generate_pool_members(self, auth_token, stack_template,
