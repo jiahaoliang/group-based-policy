@@ -219,8 +219,16 @@ class OctaviaDataModelBuilder(object):
             args.update({
                 'members': members
             })
+        if pool_dict.get('healthmonitor'):
+            healthmonitor = self.get_healthmonitor_octavia_model(
+                pool_dict.get('healthmonitor'))
+            if not healthmonitor.pool:
+                healthmonitor.pool = ret
+            args.update({
+                'health_monitor': healthmonitor
+            })
 
-        # TODO: HealthMonitor, L7Policy are not added
+        # TODO: L7Policy are not added
         args.update({
             'protocol': pool.protocol,
             'lb_algorithm': pool.lb_algorithm,
