@@ -247,6 +247,34 @@ class OctaviaDataModelBuilder(object):
         ret = self._update(ret, args)
         return ret
 
+    # Translate HealthMonitor neutron model dict to octavia model
+    def get_healthmonitor_octavia_model(self, hm_dict):
+        hm = n_data_models.HealthMonitor.from_dict(
+            copy.deepcopy(hm_dict)
+        )
+        ret = o_data_models.HealthMonitor()
+        args = {
+            'id': hm.id,
+            'project_id': hm.tenant_id,
+            'type': hm.type,
+            'delay': hm.delay,
+            'timeout': hm.timeout,
+            'rise_threshold': hm.max_retries,
+            'fall_threshold': hm.max_retries,
+            'http_method': hm.http_method,
+            'url_path': hm.url_path,
+            'expected_codes': hm.expected_codes,
+            'enabled': hm.admin_state_up
+        }
+        if hm_dict.get('pool'):
+            pool = self.get_pool_octavia_model(hm_dict.get('pool'))
+            args.update({
+                'pool': pool,
+                'pool_id': pool.id
+            })
+        ret = self._update(ret, args)
+        return ret
+
 
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
@@ -520,14 +548,20 @@ class HaproxyMemberManager(HaproxyCommonManager,
 class HaproxyHealthMonitorManager(HaproxyCommonManager,
                                   n_driver_base.BaseHealthMonitorManager):
 
-    def create(self, context, obj):
+    def create(self, context, hm):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, hm['id'])
+        hm_o_obj = self.driver.o_models_builder.\
+            get_healthmonitor_octavia_model(hm)
+        listener_o_obj = hm_o_obj.pool.listeners[0]
+        load_balancer_o_obj = hm_o_obj.pool.load_balancer
+        self.driver.amphora_driver.update(listener_o_obj,
+                                          load_balancer_o_obj.vip)
 
-    def update(self, context, old_obj, obj):
+    def update(self, context, old_hm, hm):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, update %s", self.__class__.__name__, hm['id'])
 
-    def delete(self, context, obj):
+    def delete(self, context, hm):
         ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, hm['id'])
