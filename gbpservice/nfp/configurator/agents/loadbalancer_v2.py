@@ -381,7 +381,7 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
                          binding_key=member['pool']['loadbalancer_id'],
                          key=member['id'])
 
-    def create_healthmonitor(self, context, health_monitor):
+    def create_healthmonitor(self, context, healthmonitor):
         """Enqueues event for worker to process create health monitor request.
 
         :param context: RPC context
@@ -392,15 +392,15 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
 
         """
         arg_dict = {'context': context,
-                    'health_monitor': health_monitor
+                    'health_monitor': healthmonitor
                     }
         self._send_event(lb_constants.EVENT_CREATE_HEALTH_MONITOR,
                          arg_dict, serialize=True,
-                         binding_key=health_monitor['pools'][0]['id'],
-                         key=health_monitor['id'])
+                         binding_key=healthmonitor['pool']['id'],
+                         key=healthmonitor['id'])
 
-    def update_healthmonitor(self, context, old_health_monitor,
-                                   health_monitor):
+    def update_healthmonitor(self, context, old_healthmonitor,
+                                   healthmonitor):
         """Enqueues event for worker to process update health monitor request.
 
         :param context: RPC context
@@ -412,15 +412,15 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
 
         """
         arg_dict = {'context': context,
-                    'old_health_monitor': old_health_monitor,
-                    'health_monitor': health_monitor
+                    'old_health_monitor': old_healthmonitor,
+                    'health_monitor': healthmonitor
                     }
         self._send_event(lb_constants.EVENT_UPDATE_HEALTH_MONITOR,
                          arg_dict, serialize=True,
-                         binding_key=health_monitor['pools'][0]['id'],
-                         key=health_monitor['id'])
+                         binding_key=healthmonitor['pool']['id'],
+                         key=healthmonitor['id'])
 
-    def delete_healthmonitor(self, context, health_monitor):
+    def delete_healthmonitor(self, context, healthmonitor):
         """Enqueues event for worker to process delete health monitor request.
 
         :param context: RPC context
@@ -431,12 +431,12 @@ class LBaaSv2RpcManager(agent_base.AgentBaseRPCManager):
 
         """
         arg_dict = {'context': context,
-                    'health_monitor': health_monitor
+                    'health_monitor': healthmonitor
                     }
         self._send_event(lb_constants.EVENT_DELETE_HEALTH_MONITOR,
                          arg_dict, serialize=True,
-                         binding_key=health_monitor['pools'][0]['id'],
-                         key=health_monitor['id'])
+                         binding_key=healthmonitor['pool']['id'],
+                         key=healthmonitor['id'])
 
     # TODO(jiahao): copy from v1 agent need to review
     def agent_updated(self, context, payload):
@@ -591,7 +591,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                     self.plugin_rpc.update_status(
                         'loadbalancer', loadbalancer['id'], root_lb_id,
                         lb_constants.ERROR, lb_constants.OFFLINE, agent_info,
-                        loadbalancer)
+                        None)
                     return
                 driver = self.drivers[driver_id]
                 driver.load_balancer.create(context, loadbalancer) 
@@ -767,18 +767,18 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         service_vendor = agent_info['service_vendor']
         driver = self._get_driver(service_vendor)  # (pool_id)
 
-        pool_id = data['pool_id']
+        pool_id = health_monitor['pool']['id']
         assoc_id = {'pool_id': pool_id,
                     'monitor_id': health_monitor['id']}
         try:
             if operation == 'create':
-                driver.health_monitor.create(context, health_monitor, pool_id)
+                driver.health_monitor.create(context, health_monitor)
             elif operation == 'update':
                 old_health_monitor = data['old_health_monitor']
                 driver.health_monitor.update(context, old_health_monitor, 
-                                                  health_monitor, pool_id)
+                                                  health_monitor)
             elif operation == 'delete':
-                driver.health_monitor.delete(context, health_monitor, pool_id)
+                driver.health_monitor.delete(context, health_monitor)
                 return  # Don't update object status for delete operation
         except Exception:
             if operation == 'delete':
@@ -788,12 +788,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 self.plugin_rpc.update_status(
                     'healthmonitor', health_monitor['id'], root_lb_id,
                     lb_constants.ERROR,  lb_constants.OFFLINE,
-                    agent_info, health_monitor)
+                    agent_info, None)
         else:
             self.plugin_rpc.update_status(
                     'healthmonitor', health_monitor['id'], root_lb_id,
                     lb_constants.ACTIVE,  lb_constants.ONLINE,
-                    agent_info, health_monitor)
+                    agent_info, None)
 
     def _create_health_monitor(self, ev):
         self._handle_event_health_monitor(ev, 'create')
