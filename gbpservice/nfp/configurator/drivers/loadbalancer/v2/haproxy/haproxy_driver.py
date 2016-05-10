@@ -481,6 +481,16 @@ class HaproxyPoolManager(HaproxyCommonManager,
 class HaproxyMemberManager(HaproxyCommonManager,
                            n_driver_base.BaseMemberManager):
 
+    def _remove_member(self, member):
+        member_id = member['id']
+        # TODO: In Mitaka, we need to handle multiple pools
+        default_pool = member['pool']['listener']['default_pool']
+        for index, item in enumerate(default_pool['members']):
+            if item['id'] == member_id:
+                index_to_remove = index
+                break
+        default_pool['members'].pop(index_to_remove)
+
     def create(self, context, member):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, member['id'])
@@ -498,6 +508,13 @@ class HaproxyMemberManager(HaproxyCommonManager,
     def delete(self, context, member):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, member['id'])
+        self._remove_member(member)
+        member_o_obj = self.driver.o_models_builder.\
+            get_member_octavia_model(member)
+        listener_o_obj = member_o_obj.pool.listeners[0]
+        load_balancer_o_obj = member_o_obj.pool.load_balancer
+        self.driver.amphora_driver.update(listener_o_obj,
+                                          load_balancer_o_obj.vip)
 
 
 class HaproxyHealthMonitorManager(HaproxyCommonManager,

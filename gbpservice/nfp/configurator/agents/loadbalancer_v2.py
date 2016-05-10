@@ -616,12 +616,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 self.plugin_rpc.update_status(
                     'loadbalancer', loadbalancer['id'], root_lb_id,
                     lb_constants.ERROR, lb_constants.OFFLINE,
-                    agent_info, loadbalancer)
+                    agent_info, None)
         else:
             self.plugin_rpc.update_status(
                     'loadbalancer', loadbalancer['id'], root_lb_id,
                     lb_constants.ACTIVE, lb_constants.ONLINE,
-                    agent_info, loadbalancer)
+                    agent_info, None)
 
     def _create_loadbalancer(self, ev):
         self._handle_event_loadbalancer(ev, 'create')
@@ -657,12 +657,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 self.plugin_rpc.update_status(
                     'listener', listener['id'], root_lb_id,
                     lb_constants.ERROR,  lb_constants.OFFLINE,
-                    agent_info, listener)
+                    agent_info, None)
         else:
             self.plugin_rpc.update_status(
                     'listener', listener['id'], root_lb_id,
                     lb_constants.ACTIVE,  lb_constants.ONLINE,
-                    agent_info, listener)
+                    agent_info, None)
 
     def _create_listener(self, ev):
         self._handle_event_listener(ev, 'create')
@@ -698,12 +698,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 self.plugin_rpc.update_status(
                     'pool', pool['id'], root_lb_id,
                     lb_constants.ERROR,  lb_constants.OFFLINE,
-                    agent_info, pool)
+                    agent_info, None)
         else:
             self.plugin_rpc.update_status(
                     'pool', pool['id'], root_lb_id,
                     lb_constants.ACTIVE,  lb_constants.ONLINE,
-                    agent_info, pool)
+                    agent_info, None)
 
     def _create_pool(self, ev):
         self._handle_event_pool(ev, 'create')
@@ -739,12 +739,12 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
                 self.plugin_rpc.update_status(
                     'member', member['id'], root_lb_id,
                     lb_constants.ERROR,  lb_constants.OFFLINE,
-                    agent_info, member)
+                    agent_info, None)
         else:
             self.plugin_rpc.update_status(
                     'member', member['id'], root_lb_id,
                     lb_constants.ACTIVE,  lb_constants.ONLINE,
-                    agent_info, member)
+                    agent_info, None)
 
     def _create_member(self, ev):
         self._handle_event_member(ev, 'create')
