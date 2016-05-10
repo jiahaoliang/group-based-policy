@@ -101,6 +101,13 @@ class OctaviaDataModelBuilder(object):
             load_balancer=ret
         )
         amphorae = self.driver.get_amphora(loadbalancer.id)
+        if not amphorae:
+            self.driver.add_amphora(loadbalancer_dict['id'],
+                                    loadbalancer_dict['description'])
+            amphorae = self.driver.get_amphora(loadbalancer.id)
+            if not amphorae:
+                raise exceptions.IncompleteData(
+                    "Amphora information is missing")
         # TODO: vrrp_group, topology, server_group_id are not included yet
         args.update({
             'vip': vip,
@@ -309,12 +316,19 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     def get_amphora(self, loadbalancer_id):
         return self.amphorae.get(loadbalancer_id)
 
-    def add_amphora(self, loadbalancer_id,
-                    lb_network_ip, amp_id, status=constants.ACTIVE):
+    def add_amphora(self, loadbalancer_id, descritption,
+                    status=constants.ACTIVE):
+        sc_metadata = ast.literal_eval(descritption)
+        if not (sc_metadata.get('floating_ip')
+                and sc_metadata.get('network_function_id')):
+            raise exceptions.IncompleteData(
+                "Amphora information is missing")
         if not self.get_amphora(loadbalancer_id):
-            amp = o_data_models.Amphora(lb_network_ip=lb_network_ip,
-                                        id=amp_id,
-                                        status=status)
+            # TODO(jiahao): use network_function_id as amphora id
+            amp = o_data_models.Amphora(
+                lb_network_ip=sc_metadata['floating_ip'],
+                id=sc_metadata['network_function_id'],
+                status=status)
             self.amphorae[loadbalancer_id] = [amp]
 
     def configure_healthmonitor(self, context, kwargs):
@@ -416,11 +430,8 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
 
-        # TODO(jiahao): use network_function_id as amphora id
-        sc_metadata = ast.literal_eval(loadbalancer['description'])
         self.driver.add_amphora(loadbalancer['id'],
-                                sc_metadata['floating_ip'],
-                                sc_metadata['network_function_id'])
+                                loadbalancer['description'])
         loadbalancer_o_obj = self.driver.o_models_builder.\
             get_loadbalancer_octavia_model(loadbalancer)
         amphorae_network_config = self._get_amphorae_network_config(
