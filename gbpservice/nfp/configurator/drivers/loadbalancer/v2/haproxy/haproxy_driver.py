@@ -358,6 +358,8 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
 
 class HaproxyCommonManager(object):
 
+    def _deploy(self, obj):
+        pass
     def create(self, context, obj):
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
 
@@ -393,29 +395,6 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                     raise exceptions.IncompleteData(
                         "VIP subnet information is not found")
 
-                # Get vip_port
-                vip_port = None
-                for port_dict in context['service_info']['ports']:
-                    if port_dict['id'] == loadbalancer_n_obj.vip_port_id:
-                        vip_port = n_data_models.Port.from_dict(
-                            copy.deepcopy(port_dict))
-                        break
-                if vip_port is None:
-                    raise  exceptions.IncompleteData(
-                        "VIP port information is not found")
-
-                # Get vrrp_port
-                # vrrp_port = None
-                # for port_dict in context['service_info']['ports']:
-                #     if port_dict['device_id'] == amp.compute_id:
-                #         for fix_ip in port_dict['fixed_ips']:
-                #             if fix_ip['subnet_id'] == \
-                #                     loadbalancer_n_obj.vip_subnet_id:
-                #                 vrrp_port = n_data_models.Port.from_dict(
-                #                     copy.deepcopy(port_dict))
-                #                 break
-                #         if vrrp_port is not None:
-                #             break
                 sc_metadata = ast.literal_eval(
                     loadbalancer_dict['description'])
                 vrrp_port = n_data_models.Port(
@@ -428,7 +407,6 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                     network_data_models.AmphoraNetworkConfig(
                         amphora=amp,
                         vip_subnet=vip_subnet,
-                        vip_port=vip_port,
                         vrrp_port=vrrp_port
                     )
 
@@ -500,14 +478,23 @@ class HaproxyListenerManager(HaproxyCommonManager,
     def delete(self, context, listener):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, listener['id'])
+        listener_o_obj = self.driver.o_models_builder.\
+            get_listener_octavia_model(listener)
+        self.driver.amphora_driver.delete(listener_o_obj,
+                                          listener_o_obj.load_balancer.vip)
 
 
 class HaproxyPoolManager(HaproxyCommonManager,
                          n_driver_base.BasePoolManager):
 
-    def create(self, context, pool):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, pool['id'])
+    def _remove_pool(self, pool):
+        pool_id = pool['id']
+        # TODO: In Mitaka, we need to handle multiple pools
+        default_pool = pool['listener']['default_pool']
+        if default_pool['id'] == pool_id:
+            pool['listener']['default_pool'] = None
+
+    def _deploy(self, pool):
         pool_o_obj = self.driver.o_models_builder.\
             get_pool_octavia_model(pool)
         # For Mitaka, that would be multiple listeners within pool
@@ -516,6 +503,11 @@ class HaproxyPoolManager(HaproxyCommonManager,
         self.driver.amphora_driver.update(listener_o_obj,
                                           load_balancer_o_obj.vip)
 
+    def create(self, context, pool):
+        ForkedPdb().set_trace()
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, pool['id'])
+        self._deploy(pool)
+
     def update(self, context, old_pool, pool):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, pool['id'])
@@ -523,10 +515,21 @@ class HaproxyPoolManager(HaproxyCommonManager,
     def delete(self, context, pool):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, pool['id'])
+        self._remove_pool(pool)
+        self._deploy(pool)
+
 
 
 class HaproxyMemberManager(HaproxyCommonManager,
                            n_driver_base.BaseMemberManager):
+
+    def _deploy(self, member):
+        member_o_obj = self.driver.o_models_builder.\
+            get_member_octavia_model(member)
+        listener_o_obj = member_o_obj.pool.listeners[0]
+        load_balancer_o_obj = member_o_obj.pool.load_balancer
+        self.driver.amphora_driver.update(listener_o_obj,
+                                          load_balancer_o_obj.vip)
 
     def _remove_member(self, member):
         member_id = member['id']
@@ -541,12 +544,7 @@ class HaproxyMemberManager(HaproxyCommonManager,
     def create(self, context, member):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, create %s", self.__class__.__name__, member['id'])
-        member_o_obj = self.driver.o_models_builder.\
-            get_member_octavia_model(member)
-        listener_o_obj = member_o_obj.pool.listeners[0]
-        load_balancer_o_obj = member_o_obj.pool.load_balancer
-        self.driver.amphora_driver.update(listener_o_obj,
-                                          load_balancer_o_obj.vip)
+        self._deploy(member)
 
     def update(self, context, old_member, member):
         ForkedPdb().set_trace()
@@ -556,26 +554,30 @@ class HaproxyMemberManager(HaproxyCommonManager,
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, member['id'])
         self._remove_member(member)
-        member_o_obj = self.driver.o_models_builder.\
-            get_member_octavia_model(member)
-        listener_o_obj = member_o_obj.pool.listeners[0]
-        load_balancer_o_obj = member_o_obj.pool.load_balancer
-        self.driver.amphora_driver.update(listener_o_obj,
-                                          load_balancer_o_obj.vip)
+        self._deploy(member)
 
 
 class HaproxyHealthMonitorManager(HaproxyCommonManager,
                                   n_driver_base.BaseHealthMonitorManager):
 
-    def create(self, context, hm):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, hm['id'])
+    def _deploy(self, hm):
         hm_o_obj = self.driver.o_models_builder.\
             get_healthmonitor_octavia_model(hm)
         listener_o_obj = hm_o_obj.pool.listeners[0]
         load_balancer_o_obj = hm_o_obj.pool.load_balancer
         self.driver.amphora_driver.update(listener_o_obj,
                                           load_balancer_o_obj.vip)
+
+    def _remove_healthmonitor(self, hm):
+        hm_id = hm['id']
+        default_pool = hm['pool']['listener']['default_pool']
+        if default_pool['healthmonitor']['id'] == hm_id:
+            default_pool['healthmonitor'] = None
+
+    def create(self, context, hm):
+        ForkedPdb().set_trace()
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, hm['id'])
+        self._deploy(hm)
 
     def update(self, context, old_hm, hm):
         ForkedPdb().set_trace()
@@ -584,3 +586,5 @@ class HaproxyHealthMonitorManager(HaproxyCommonManager,
     def delete(self, context, hm):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, hm['id'])
+        self._remove_healthmonitor(hm)
+        self._deploy(hm)
