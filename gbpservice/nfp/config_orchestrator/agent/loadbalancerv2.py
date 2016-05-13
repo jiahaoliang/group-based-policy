@@ -154,13 +154,6 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
             'loadbalancer', loadbalancer=loadbalancer, driver_name=driver_name)
 
     @log_helpers.log_method_call
-    def update_loadbalancer(self, context, old_loadbalancer, loadbalancer):
-        self._post(
-            context, loadbalancer['tenant_id'],
-            'loadbalancer', old_loadbalancer=old_loadbalancer,
-            loadbalancer=loadbalancer)
-
-    @log_helpers.log_method_call
     def delete_loadbalancer(self, context, loadbalancer, delete_vip_port=True):
         self._delete(
             context, loadbalancer['tenant_id'],
@@ -171,12 +164,6 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         self._post(
             context, listener['tenant_id'],
             'listener', listener=listener)
-
-    @log_helpers.log_method_call
-    def update_listener(self, context, old_listener, listener):
-        self._post(
-            context, listener['tenant_id'],
-            'listener', old_listener=old_listener, listener=listener)
 
     @log_helpers.log_method_call
     def delete_listener(self, context, listener):
@@ -191,12 +178,6 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
             'pool', pool=pool)
 
     @log_helpers.log_method_call
-    def update_pool(self, context, old_pool, pool):
-        self._post(
-            context, pool['tenant_id'],
-            'pool', old_pool=old_pool, pool=pool)
-
-    @log_helpers.log_method_call
     def delete_pool(self, context, pool):
         self._delete(
             context, pool['tenant_id'],
@@ -207,12 +188,6 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         self._post(
             context, member['tenant_id'],
             'member', member=member)
-
-    @log_helpers.log_method_call
-    def update_member(self, context, old_member, member):
-        self._post(
-            context, member['tenant_id'],
-            'member', old_member=old_member, member=member)
 
     @log_helpers.log_method_call
     def delete_member(self, context, member):
@@ -231,13 +206,6 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         self._post(
             context, healthmonitor['tenant_id'],
             'healthmonitor', healthmonitor=healthmonitor)
-
-    def update_healthmonitor(self, context, old_healthmonitor,
-                             healthmonitor):
-        self._post(
-            context, healthmonitor['tenant_id'],
-            'healthmonitor', old_healthmonitor=old_healthmonitor,
-            healthmonitor=healthmonitor)
 
     @log_helpers.log_method_call
     def delete_healthmonitor(self, context, healthmonitor):
