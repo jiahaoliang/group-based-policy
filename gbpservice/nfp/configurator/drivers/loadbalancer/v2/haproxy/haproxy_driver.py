@@ -429,6 +429,10 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
     def update(self, context, old_loadbalancer, loadbalancer):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, loadbalancer['id'])
+        loadbalancer_o_obj = self.driver.o_models_builder.\
+            get_loadbalancer_octavia_model(loadbalancer)
+        for listener in loadbalancer_o_obj.listeners:
+            self.amphora_driver.update(listener, loadbalancer_o_obj.vip)
 
     def delete(self, context, loadbalancer):
         ForkedPdb().set_trace()
@@ -463,17 +467,21 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
 class HaproxyListenerManager(HaproxyCommonManager,
                              n_driver_base.BaseListenerManager):
 
-    def create(self, context, listener):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, listener['id'])
+    def _deploy(self, listener):
         listener_o_obj = self.driver.o_models_builder.\
             get_listener_octavia_model(listener)
         self.driver.amphora_driver.update(listener_o_obj,
                                           listener_o_obj.load_balancer.vip)
 
+    def create(self, context, listener):
+        ForkedPdb().set_trace()
+        LOG.info("LB %s no-op, create %s", self.__class__.__name__, listener['id'])
+        self._deploy(listener)
+
     def update(self, context, old_listener, listener):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, listener['id'])
+        self._deploy(listener)
 
     def delete(self, context, listener):
         ForkedPdb().set_trace()
@@ -511,6 +519,7 @@ class HaproxyPoolManager(HaproxyCommonManager,
     def update(self, context, old_pool, pool):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, pool['id'])
+        self._deploy(pool)
 
     def delete(self, context, pool):
         ForkedPdb().set_trace()
@@ -549,6 +558,7 @@ class HaproxyMemberManager(HaproxyCommonManager,
     def update(self, context, old_member, member):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, member['id'])
+        self._deploy(member)
 
     def delete(self, context, member):
         ForkedPdb().set_trace()
@@ -582,6 +592,7 @@ class HaproxyHealthMonitorManager(HaproxyCommonManager,
     def update(self, context, old_hm, hm):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, hm['id'])
+        self._deploy(hm)
 
     def delete(self, context, hm):
         ForkedPdb().set_trace()
