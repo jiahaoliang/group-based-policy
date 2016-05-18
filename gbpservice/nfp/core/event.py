@@ -10,12 +10,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ast
 import multiprocessing
 import os
 import time
 import uuid as pyuuid
-import zlib
 
 from oslo_log import log as oslo_logging
 
@@ -54,11 +52,10 @@ class EventDesc(object):
 class Event(object):
 
     def __init__(self, **kwargs):
-        self.zipped = False
         # ID of the event, can be same for multiple events
         self.id = kwargs.get('id')
         # Module context, not decoded by core
-        self.data = self.compress(kwargs.get('data', None))
+        self.data = kwargs.get('data', None)
         # Handler used only @the time of registration
         self.handler = kwargs.get('handler', None)
         # To serialize this event.
@@ -74,25 +71,6 @@ class Event(object):
         self.zipped = False
         # Added for log metadata
         self.context = kwargs.get('context', {})
-
-    def compress(self, data):
-        if data and not self.zipped:
-            self.zipped = True
-            return zlib.compress(str({'cdata': data}))
-        else:
-            return data
-
-    def decompress(self):
-        if self.data and self.zipped:
-            try:
-                data = ast.literal_eval(
-                    zlib.decompress(self.data))
-                self.data = data['cdata']
-                self.zipped = False
-            except Exception as e:
-                LOG(LOGGER, 'ERROR',
-                    "Failed to decompress event data : %s Reason: %s" % (
-                        self.data, e))
 
     def identify(self):
         if hasattr(self, 'desc'):
