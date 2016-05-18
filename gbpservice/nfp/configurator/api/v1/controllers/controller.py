@@ -10,7 +10,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import zlib
 import oslo_serialization.jsonutils as jsonutils
 
 from neutron.agent.common import config
@@ -78,7 +77,7 @@ class Controller(BaseController):
 
             self.rpc_routing_table[api].append(CloudService(**service))
 
-    @pecan.expose(method='GET', content_type='application/octet-stream')
+    @pecan.expose(method='GET', content_type='application/json')
     def get(self):
         """Method of REST server to handle request get_notifications.
 
@@ -99,16 +98,16 @@ class Controller(BaseController):
                        % notification_data)
                 LOG.info(msg)
                 return jsonutils.dumps(notification_data)
+
         except Exception as err:
             pecan.response.status = 400
             msg = ("Failed to get handle request=%s. Reason=%s."
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             error_data = self._format_description(msg)
-            errors = jsonutils.dumps(error_data)
-            return zlib.compress(errors)
+            return jsonutils.dumps(error_data)
 
-    @pecan.expose(method='POST', content_type='application/octet-stream')
+    @pecan.expose(method='POST', content_type='application/json')
     def post(self, **body):
         """Method of REST server to handle all the post requests.
 
@@ -146,10 +145,9 @@ class Controller(BaseController):
             LOG.debug(extra_import)
             LOG.error(msg)
             error_data = self._format_description(msg)
-            errors = jsonutils.dumps(error_data)
-            return zlib.compress(errors)
+            return jsonutils.dumps(error_data)
 
-    @pecan.expose(method='PUT', content_type='application/octet-stream')
+    @pecan.expose(method='PUT', content_type='application/json')
     def put(self, **body):
         """Method of REST server to handle all the put requests.
 
@@ -183,8 +181,7 @@ class Controller(BaseController):
                    % (self.method_name, str(err).capitalize()))
             LOG.error(msg)
             error_data = self._format_description(msg)
-            errors = jsonutils.dumps(error_data)
-            return zlib.compress(errors)
+            return jsonutils.dumps(error_data)
 
     def _format_description(self, msg):
         """This methgod formats error description.
