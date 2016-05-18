@@ -33,7 +33,7 @@ def rpc_init(sc, conf):
     )
 
     lb_report_state = {
-        'binary': 'oc-lb-agent',
+        'binary': 'NCO',
         'host': cfg.CONF.host,
         'topic': a_topics.LB_NFP_CONFIGAGENT_TOPIC,
         'plugin_topic': a_topics.LB_NFP_PLUGIN_TOPIC,
@@ -52,7 +52,7 @@ def rpc_init(sc, conf):
     )
 
     lbv2_report_state = {
-        'binary': 'oc-lb-agentv2',
+        'binary': 'NCO',
         'host': cfg.CONF.host,
         'topic': a_topics.LBV2_NFP_CONFIGAGENT_TOPIC,
         'plugin_topic': a_topics.LBV2_NFP_PLUGIN_TOPIC,
@@ -71,7 +71,7 @@ def rpc_init(sc, conf):
     )
 
     vpn_report_state = {
-        'binary': 'oc-vpn-agent',
+        'binary': 'NCO',
         'host': cfg.CONF.host,
         'topic': a_topics.VPN_NFP_CONFIGAGENT_TOPIC,
         'plugin_topic': a_topics.VPN_NFP_PLUGIN_TOPIC,
@@ -107,6 +107,8 @@ def events_init(sc, conf):
         Event(id='SERVICE_CREATED',
               handler=otc_se.OTCServiceEventsHandler(sc, conf)),
         Event(id='SERVICE_DELETED',
+              handler=otc_se.OTCServiceEventsHandler(sc, conf)),
+        Event(id='SERVICE_CREATE_PENDING',
               handler=otc_se.OTCServiceEventsHandler(sc, conf))]
 
     sc.register_events(evs)

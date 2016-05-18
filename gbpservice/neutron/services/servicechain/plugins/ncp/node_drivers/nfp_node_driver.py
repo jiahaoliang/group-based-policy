@@ -192,7 +192,7 @@ class NFPClientApi(object):
     def consumer_ptg_added_notification(self, context, network_function_id,
                                         policy_target_group):
         cctxt = self.client.prepare(version=self.RPC_API_VERSION)
-        cctxt.cast(context,
+        return cctxt.call(context,
                    'consumer_ptg_added_notification',
                    network_function_id=network_function_id,
                    policy_target_group=policy_target_group)
@@ -207,7 +207,7 @@ class NFPClientApi(object):
     def consumer_ptg_removed_notification(self, context, network_function_id,
                                           policy_target_group):
         cctxt = self.client.prepare(version=self.RPC_API_VERSION)
-        cctxt.cast(context,
+        return cctxt.call(context,
                    'consumer_ptg_removed_notification',
                    network_function_id=network_function_id,
                    policy_target_group=policy_target_group)
@@ -222,7 +222,7 @@ class NFPClientApi(object):
     def policy_target_added_notification(self, context, network_function_id,
                                          policy_target):
         cctxt = self.client.prepare(version=self.RPC_API_VERSION)
-        cctxt.cast(context,
+        return cctxt.call(context,
                    'policy_target_added_notification',
                    network_function_id=network_function_id,
                    policy_target=policy_target)
@@ -237,7 +237,7 @@ class NFPClientApi(object):
     def policy_target_removed_notification(self, context, network_function_id,
                                            policy_target):
         cctxt = self.client.prepare(version=self.RPC_API_VERSION)
-        cctxt.cast(context,
+        return cctxt.call(context,
                    'policy_target_removed_notification',
                    network_function_id=network_function_id,
                    policy_target=policy_target)
@@ -257,7 +257,7 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
     SUPPORTED_SERVICE_VENDOR_MAPPING = {
         pconst.LOADBALANCERV2: ["haproxy_lbaasv2"],
         pconst.LOADBALANCER: ["haproxy"],
-        pconst.FIREWALL: ["vyos"],
+        pconst.FIREWALL: ["vyos", "nfp"],
         pconst.VPN: ["vyos"],
     }
     vendor_name = 'NFP'
@@ -457,6 +457,8 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
                 network_function_id = network_function_map.network_function_id
                 self.nfp_notifier.policy_target_added_notification(
                     context.plugin_context, network_function_id, policy_target)
+                self._wait_for_network_function_operation_completion(
+                    context, network_function_id, operation='update')
 
     def update_policy_target_removed(self, context, policy_target):
         if context.current_profile['service_type'] in [pconst.LOADBALANCER,
@@ -475,6 +477,8 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
                 network_function_id = network_function_map.network_function_id
                 self.nfp_notifier.policy_target_removed_notification(
                     context.plugin_context, network_function_id, policy_target)
+                self._wait_for_network_function_operation_completion(
+                    context, network_function_id, operation='update')
 
     def notify_chain_parameters_updated(self, context):
         pass  # We are not using the classifier specified in redirect Rule
@@ -495,6 +499,8 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
                     context.plugin_context,
                     network_function_id,
                     policy_target_group)
+                self._wait_for_network_function_operation_completion(
+                    context, network_function_id, operation='update')
 
     def update_node_consumer_ptg_removed(self, context, policy_target_group):
         if context.current_profile['service_type'] == pconst.FIREWALL:
@@ -512,6 +518,8 @@ class NFPNodeDriver(driver_base.NodeDriverBase):
                     context.plugin_context,
                     network_function_id,
                     policy_target_group)
+                self._wait_for_network_function_operation_completion(
+                    context, network_function_id, operation='update')
 
     def _wait_for_network_function_delete_completion(self, context,
                                                      network_function_id):

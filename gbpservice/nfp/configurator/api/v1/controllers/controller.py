@@ -19,7 +19,8 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
 import pecan
-from pecan import rest
+
+from base_controller import BaseController
 
 LOG = logging.getLogger(__name__)
 n_rpc.init(cfg.CONF)
@@ -36,7 +37,7 @@ call/cast to configurator and return response to config-agent
 """
 
 
-class Controller(rest.RestController):
+class Controller(BaseController):
 
     def __init__(self, method_name):
         try:
@@ -97,8 +98,7 @@ class Controller(rest.RestController):
                 msg = ("NOTIFICATION_DATA sent to config_agent %s"
                        % notification_data)
                 LOG.info(msg)
-                notifications = jsonutils.dumps(notification_data)
-                return zlib.compress(notifications)
+                return jsonutils.dumps(notification_data)
         except Exception as err:
             pecan.response.status = 400
             msg = ("Failed to get handle request=%s. Reason=%s."
@@ -125,9 +125,7 @@ class Controller(rest.RestController):
         try:
             body = None
             if pecan.request.is_body_readable:
-                zippedBody = pecan.request.body
-                body = zlib.decompress(zippedBody)
-                body = jsonutils.loads(body)
+                body = pecan.request.json_body
             if self.method_name == 'network_function_event':
                 routing_key = 'VISIBILITY'
             else:
@@ -139,6 +137,7 @@ class Controller(rest.RestController):
 
             msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
+
         except Exception as err:
             pecan.response.status = 400
             msg = ("Failed to serve HTTP post request %s %s."
@@ -166,9 +165,7 @@ class Controller(rest.RestController):
         try:
             body = None
             if pecan.request.is_body_readable:
-                zippedBody = pecan.request.body
-                body = zlib.decompress(zippedBody)
-                body = jsonutils.loads(body)
+                body = pecan.request.json_body
             if self.method_name == 'network_function_event':
                 routing_key = 'VISIBILITY'
             else:
@@ -177,9 +174,9 @@ class Controller(rest.RestController):
                 uservice.rpcclient.cast(self.method_name, body)
                 msg = ('Sent RPC to %s' % (uservice.topic))
                 LOG.info(msg)
-
             msg = ("Successfully served HTTP request %s" % self.method_name)
             LOG.info(msg)
+
         except Exception as err:
             pecan.response.status = 400
             msg = ("Failed to serve HTTP put request %s %s."

@@ -23,6 +23,8 @@ from neutron_lbaas.drivers import driver_base as n_driver_base
 from gbpservice.nfp.common import exceptions
 from gbpservice.nfp.configurator.lib import lbv2_constants
 from gbpservice.nfp.configurator.drivers.base import base_driver
+from gbpservice.nfp.configurator.drivers.loadbalancer.v1.haproxy.\
+    haproxy_lb_driver import LbGenericConfigDriver
 
 from gbpservice.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import neutron_lbaas_data_models as n_data_models
@@ -292,6 +294,7 @@ class OctaviaDataModelBuilder(object):
 
 
 class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
+                                LbGenericConfigDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
     service_vendor = 'haproxy_lbaasv2'
@@ -300,7 +303,7 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     #                                 lb_network_ip, id, status)]}
     amphorae = {}
 
-    def __init__(self, plugin=None):
+    def __init__(self, plugin=None, conf=None):
         super(HaproxyLoadBalancerDriver, self).__init__(plugin)
 
         # Each of the major LBaaS objects in the neutron database
@@ -310,6 +313,8 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
         # config or a rest client handle, here.
         #
         # This function is executed when neutron-server starts.
+        self.conf = conf
+        self.port = lbv2_constants.HAPROXY_AGENT_LISTEN_PORT
 
         self.amphora_driver = HaproxyAmphoraLoadBalancerDriver()
 
@@ -339,22 +344,6 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                 status=status)
             self.amphorae[loadbalancer_id] = [amp]
 
-    def configure_healthmonitor(self, context, kwargs):
-        """Overriding BaseDriver's configure_healthmonitor().
-           It does netcat to HAPROXY_AGENT_LISTEN_PORT 1234.
-           HaProxy agent runs inside service vm..Once agent is up and
-           reachable, service vm is assumed to be active.
-
-           :param context - context
-           :param kwargs - kwargs coming from orchestrator
-
-           Returns: SUCCESS/FAILED
-
-        """
-        ip = kwargs.get('mgmt_ip')
-        port = str(lbv2_constants.HAPROXY_AGENT_LISTEN_PORT)
-        command = 'nc ' + ip + ' ' + port + ' -z'
-        return self._check_vm_health(command)
 
 class HaproxyCommonManager(object):
 

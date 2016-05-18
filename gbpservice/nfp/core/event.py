@@ -70,6 +70,10 @@ class Event(object):
         # Max number of times this event can be polled.
         # Default, till stopped or forever.
         self.max_times = -1
+        # Identifies whether event.data is zipped
+        self.zipped = False
+        # Added for log metadata
+        self.context = kwargs.get('context', {})
 
     def compress(self, data):
         if data and not self.zipped:
@@ -285,7 +289,7 @@ class EventQueueHandler(object):
         while True:
             event = self._get()
             if event:
-                event.decompress()
+                self._sc.decompress(event)
                 LOG(LOGGER, 'DEBUG',
                     "%s - worker - got new event" % (event.identify()))
                 eh = self._ehs.get(event)
