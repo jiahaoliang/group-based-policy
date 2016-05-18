@@ -98,8 +98,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         if context.is_admin:
             tenant_id = context.tenant_id
         filters = {'tenant_id': [tenant_id]}
-        # TODO(jiahao): _get_lb_context() fails for flavor_id
-        db = self._get_lb_context(context, filters)
+        # TODO(jiahao): _get_lb_context() fails for flavor_id, disable it
+        # db = self._get_lb_context(context, filters)
+        db = {}
         db.update(self._get_core_context(context, filters))
         return db
 
@@ -111,7 +112,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         # dictionary format to the configurator.
         db = self._context(context, tenant_id)
         rsrc_ctx_dict = copy.deepcopy(ctx_dict)
-        db = self._filter_service_info_with_resource(db)
+        # TODO(jiahao): _get_lb_context() fails for flavor_id,
+        # disable filter for now
+        # db = self._filter_service_info_with_resource(db)
         rsrc_ctx_dict.update({'service_info': db})
         return ctx_dict, rsrc_ctx_dict
 
