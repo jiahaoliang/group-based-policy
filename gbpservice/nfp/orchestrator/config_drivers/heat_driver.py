@@ -768,12 +768,20 @@ class HeatDriver(object):
                                               network_function['id'],
                                               service_vendor)))
 
+            if service_type == pconst.LOADBALANCER:
                 lb_pool_key = self._get_heat_resource_key(
                     stack_template[resources_key],
                     is_template_aws_version,
                     'OS::Neutron::Pool')
                 stack_template[resources_key][lb_pool_key][properties_key][
                     'description'] = str(common_desc)
+            else:
+                lb_loadbalancer_key = self._get_heat_resource_key(
+                    stack_template[resources_key],
+                    is_template_aws_version,
+                    'OS::Neutron::LBaaS::LoadBalancer')
+                stack_template[resources_key][lb_loadbalancer_key][
+                    properties_key]['description'] = str(common_desc)
 
         elif service_type == pconst.FIREWALL:
             stack_template = self._update_firewall_template(
