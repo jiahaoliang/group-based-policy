@@ -104,12 +104,8 @@ class OctaviaDataModelBuilder(object):
         )
         amphorae = self.driver.get_amphora(loadbalancer.id)
         if not amphorae:
-            self.driver.add_amphora(loadbalancer_dict['id'],
-                                    loadbalancer_dict['description'])
-            amphorae = self.driver.get_amphora(loadbalancer.id)
-            if not amphorae:
-                raise exceptions.IncompleteData(
-                    "Amphora information is missing")
+            raise exceptions.IncompleteData(
+                "Amphora information is missing")
         # TODO: vrrp_group, topology, server_group_id are not included yet
         args.update({
             'vip': vip,
@@ -418,6 +414,8 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
     def update(self, context, old_loadbalancer, loadbalancer):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, update %s", self.__class__.__name__, loadbalancer['id'])
+        self.driver.add_amphora(loadbalancer['id'],
+                                loadbalancer['description'])
         loadbalancer_o_obj = self.driver.o_models_builder.\
             get_loadbalancer_octavia_model(loadbalancer)
         for listener in loadbalancer_o_obj.listeners:
@@ -457,6 +455,8 @@ class HaproxyListenerManager(HaproxyCommonManager,
                              n_driver_base.BaseListenerManager):
 
     def _deploy(self, listener):
+        self.driver.add_amphora(listener['loadbalancer_id'],
+                                listener['description'])
         listener_o_obj = self.driver.o_models_builder.\
             get_listener_octavia_model(listener)
         self.driver.amphora_driver.update(listener_o_obj,
@@ -475,6 +475,8 @@ class HaproxyListenerManager(HaproxyCommonManager,
     def delete(self, context, listener):
         ForkedPdb().set_trace()
         LOG.info("LB %s no-op, delete %s", self.__class__.__name__, listener['id'])
+        self.driver.add_amphora(listener['loadbalancer_id'],
+                                listener['description'])
         listener_o_obj = self.driver.o_models_builder.\
             get_listener_octavia_model(listener)
         self.driver.amphora_driver.delete(listener_o_obj,
@@ -492,6 +494,8 @@ class HaproxyPoolManager(HaproxyCommonManager,
             pool['listener']['default_pool'] = None
 
     def _deploy(self, pool):
+        self.driver.add_amphora(pool['loadbalancer_id'],
+                                pool['description'])
         pool_o_obj = self.driver.o_models_builder.\
             get_pool_octavia_model(pool)
         # For Mitaka, that would be multiple listeners within pool
@@ -522,6 +526,8 @@ class HaproxyMemberManager(HaproxyCommonManager,
                            n_driver_base.BaseMemberManager):
 
     def _deploy(self, member):
+        self.driver.add_amphora(member['pool']['loadbalancer_id'],
+                                member['description'])
         member_o_obj = self.driver.o_models_builder.\
             get_member_octavia_model(member)
         listener_o_obj = member_o_obj.pool.listeners[0]
@@ -560,6 +566,8 @@ class HaproxyHealthMonitorManager(HaproxyCommonManager,
                                   n_driver_base.BaseHealthMonitorManager):
 
     def _deploy(self, hm):
+        self.driver.add_amphora(hm['pool']['loadbalancer_id'],
+                                hm['description'])
         hm_o_obj = self.driver.o_models_builder.\
             get_healthmonitor_octavia_model(hm)
         listener_o_obj = hm_o_obj.pool.listeners[0]
