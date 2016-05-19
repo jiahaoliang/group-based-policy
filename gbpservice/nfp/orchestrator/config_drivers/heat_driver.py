@@ -747,15 +747,10 @@ class HeatDriver(object):
         standby_provider_port_mac = None
 
         service_vendor = service_details['service_vendor']
-        if service_type in [pconst.LOADBALANCER, pconst.LOADBALANCERV2]:
-            if service_type == pconst.LOADBALANCER:
-                self._generate_pool_members(
-                    auth_token, stack_template, config_param_values,
-                    provider, is_template_aws_version)
-            else:
-                self._generate_lbaasv2_pool_members(
-                    auth_token, stack_template, config_param_values,
-                    provider, is_template_aws_version)
+        if service_type == pconst.LOADBALANCER:
+            self._generate_pool_members(
+                auth_token, stack_template, config_param_values,
+                provider, is_template_aws_version)
             config_param_values['Subnet'] = provider_subnet['id']
             config_param_values['service_chain_metadata'] = ""
             if not base_mode_support:
@@ -768,20 +763,35 @@ class HeatDriver(object):
                                               network_function['id'],
                                               service_vendor)))
 
-            if service_type == pconst.LOADBALANCER:
                 lb_pool_key = self._get_heat_resource_key(
                     stack_template[resources_key],
                     is_template_aws_version,
                     'OS::Neutron::Pool')
                 stack_template[resources_key][lb_pool_key][properties_key][
                     'description'] = str(common_desc)
-            else:
-                lb_loadbalancer_key = self._get_heat_resource_key(
+
+        elif service_type == pconst.LOADBALANCERV2:
+            self._generate_lbaasv2_pool_members(
+                auth_token, stack_template, config_param_values,
+                provider, is_template_aws_version)
+            config_param_values['Subnet'] = provider_subnet['id']
+            config_param_values['service_chain_metadata'] = ""
+            if not base_mode_support:
+                nf_desc = str((SC_METADATA % (service_chain_instance['id'],
+                                              mgmt_ip,
+                                              provider_port_mac,
+                                              standby_provider_port_mac,
+                                              network_function['id'],
+                                              service_vendor)))
+                config_param_values[
+                    'service_chain_metadata'] = str(nf_desc)
+
+            lb_loadbalancer_key = self._get_heat_resource_key(
                     stack_template[resources_key],
                     is_template_aws_version,
                     'OS::Neutron::LBaaS::LoadBalancer')
-                stack_template[resources_key][lb_loadbalancer_key][
-                    properties_key]['description'] = str(common_desc)
+            stack_template[resources_key][lb_loadbalancer_key][
+                properties_key]['description'] = str(nf_desc)
 
         elif service_type == pconst.FIREWALL:
             stack_template = self._update_firewall_template(
