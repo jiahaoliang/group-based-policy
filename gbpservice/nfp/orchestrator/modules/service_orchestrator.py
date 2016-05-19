@@ -291,7 +291,7 @@ class RpcHandlerConfigurator(object):
                 key=original_event.key,
                 context=self.log_meta.to_dict())
             LOG.debug("poll event started for %s" % (ev.id))
-            self._controller.poll_event(ev, max_times=400)
+            self._controller.poll_event(ev, max_times=10)
         else:
             if serialize:
                 network_function_id = event_data['network_function_id']
@@ -509,7 +509,7 @@ class ServiceOrchestrator(object):
                     key=original_event.desc.uid,
                     context=self.log_meta.to_dict())
                 LOG.debug("poll event started for %s" % (ev.id))
-                self._controller.poll_event(ev, max_times=20)
+                self._controller.poll_event(ev, max_times=400)
             else:
                 if original_event:
                     ev = self._controller.new_event(
