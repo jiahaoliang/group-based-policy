@@ -12,8 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-import pdb
 import copy
 import ast
 from oslo_log import log as logging
@@ -37,31 +35,9 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
 from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     common import constants
 
-# Assume orchestrator already created this amphora
-# TODO: This part need to be removed once the ochestartor part is done
-# AMP = o_data_models.Amphora(
-#     lb_network_ip = "11.0.0.4",
-#     id = "121daa13-d64b-4aae-ba4c-6aa001971ed7",
-#     status = constants.ACTIVE
-# )
-
 DRIVER_NAME = 'loadbalancerv2'
 
 LOG = logging.getLogger(__name__)
-
-
-class ForkedPdb(pdb.Pdb):
-    """A Pdb subclass that may be used
-    from a forked multiprocessing child
-
-    """
-    def interaction(self, *args, **kwargs):
-        _stdin = sys.stdin
-        try:
-            sys.stdin = file('/dev/stdin')
-            pdb.Pdb.interaction(self, *args, **kwargs)
-        finally:
-            sys.stdin = _stdin
 
 
 # As we use the rest client and amphora image from Octavia,
@@ -294,7 +270,6 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
                                 base_driver.BaseDriver):
     service_type = 'loadbalancerv2'
     service_vendor = 'haproxy_lbaasv2'
-    # TODO(jiahao): store the amphorae info locally, need to remove later
     # amphorae = {"loadbalancer_id": [o_data_models.Amphora(
     #                                 lb_network_ip, id, status)]}
     amphorae = {}
@@ -345,14 +320,15 @@ class HaproxyCommonManager(object):
 
     def _deploy(self, obj):
         pass
+
     def create(self, context, obj):
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__, obj['id'])
 
     def update(self, context, old_obj, obj):
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__, obj['id'])
 
     def delete(self, context, obj):
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, obj['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__, obj['id'])
 
 
 class HaproxyLoadBalancerManager(HaproxyCommonManager,
@@ -398,8 +374,8 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         return amphorae_network_config
 
     def create(self, context, loadbalancer):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, loadbalancer['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__,
+                 loadbalancer['id'])
 
         self.driver.add_amphora(loadbalancer['id'],
                                 loadbalancer['description'])
@@ -412,8 +388,8 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         LOG.info("Notfied amphora of vip plug")
 
     def update(self, context, old_loadbalancer, loadbalancer):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, loadbalancer['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__,
+                 loadbalancer['id'])
         self.driver.add_amphora(loadbalancer['id'],
                                 loadbalancer['description'])
         loadbalancer_o_obj = self.driver.o_models_builder.\
@@ -422,8 +398,9 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
             self.amphora_driver.update(listener, loadbalancer_o_obj.vip)
 
     def delete(self, context, loadbalancer):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, loadbalancer['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__,
+                 loadbalancer['id'])
+        # delete loadbalancer doesn't need any operation on service vm
 
     @property
     def allocates_vip(self):
@@ -431,8 +408,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         return False
 
     def create_and_allocate_vip(self, context, obj):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create_and_allocate_vip %s",
+        LOG.info("LB %s, create_and_allocate_vip %s",
                  self.__class__.__name__, obj['id'])
         self.create(context, obj)
 
@@ -463,18 +439,15 @@ class HaproxyListenerManager(HaproxyCommonManager,
                                           listener_o_obj.load_balancer.vip)
 
     def create(self, context, listener):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, listener['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__, listener['id'])
         self._deploy(listener)
 
     def update(self, context, old_listener, listener):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, listener['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__, listener['id'])
         self._deploy(listener)
 
     def delete(self, context, listener):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, listener['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__, listener['id'])
         self.driver.add_amphora(listener['loadbalancer_id'],
                                 listener['description'])
         listener_o_obj = self.driver.o_models_builder.\
@@ -505,18 +478,15 @@ class HaproxyPoolManager(HaproxyCommonManager,
                                           load_balancer_o_obj.vip)
 
     def create(self, context, pool):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, pool['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__, pool['id'])
         self._deploy(pool)
 
     def update(self, context, old_pool, pool):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, pool['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__, pool['id'])
         self._deploy(pool)
 
     def delete(self, context, pool):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, pool['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__, pool['id'])
         self._remove_pool(pool)
         self._deploy(pool)
 
@@ -546,18 +516,15 @@ class HaproxyMemberManager(HaproxyCommonManager,
         default_pool['members'].pop(index_to_remove)
 
     def create(self, context, member):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, member['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__, member['id'])
         self._deploy(member)
 
     def update(self, context, old_member, member):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, member['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__, member['id'])
         self._deploy(member)
 
     def delete(self, context, member):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, member['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__, member['id'])
         self._remove_member(member)
         self._deploy(member)
 
@@ -582,17 +549,14 @@ class HaproxyHealthMonitorManager(HaproxyCommonManager,
             default_pool['healthmonitor'] = None
 
     def create(self, context, hm):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, create %s", self.__class__.__name__, hm['id'])
+        LOG.info("LB %s, create %s", self.__class__.__name__, hm['id'])
         self._deploy(hm)
 
     def update(self, context, old_hm, hm):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, update %s", self.__class__.__name__, hm['id'])
+        LOG.info("LB %s, update %s", self.__class__.__name__, hm['id'])
         self._deploy(hm)
 
     def delete(self, context, hm):
-        ForkedPdb().set_trace()
-        LOG.info("LB %s no-op, delete %s", self.__class__.__name__, hm['id'])
+        LOG.info("LB %s, delete %s", self.__class__.__name__, hm['id'])
         self._remove_healthmonitor(hm)
         self._deploy(hm)
