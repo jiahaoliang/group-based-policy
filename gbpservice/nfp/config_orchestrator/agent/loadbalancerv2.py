@@ -339,7 +339,8 @@ class LoadbalancerV2Notifier(object):
             # TODO(jiahao): is the key name "loadbalancer_id" correct?
             request_data.update({"service_type": service_type,
                                  "loadbalancer_id": lb_id,
-                                 "neutron_resource_id": resource_id})
+                                 "neutron_resource_id": resource_id,
+                                 "LogMetaID": nf_id})
         except Exception as e:
             LOG(LOGGER, 'ERROR', '%s' % (e))
             return request_data
