@@ -116,6 +116,8 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
         if name.lower() == 'loadbalancer':
             lb_id = kwargs['loadbalancer']['id']
             kwargs['loadbalancer'].update({'description': str(description)})
+            nfp_context = {'network_function_id': nf['id'],
+                           'loadbalancer_id': kwargs['loadbalancer']['id']}
         elif name.lower() == 'listener':
             lb_id = kwargs['listener'].get('loadbalancer_id')
             kwargs['listener']['description'] = str(description)
@@ -394,10 +396,9 @@ class LoadbalancerV2Notifier(object):
                              provisioning_status=lb_p_status,
                              operating_status=lb_o_status)
 
-        # TODO(jiahao): is the key name "loadbalancer_id" correct?
         if obj_type.lower() == 'loadbalancer':
             nf_id = notification_info['context']['network_function_id']
-            lb_id = notification_info['context']['loadbalancer']
+            lb_id = notification_info['context']['loadbalancer_id']
             # sending notification to visibility
             event_data = {'context': context.to_dict(),
                           'nf_id': nf_id,
