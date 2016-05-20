@@ -199,8 +199,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def create_listener(self, context, listener):
+        loadbalancer = listener['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(listener["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, listener['tenant_id'],
@@ -208,8 +209,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def delete_listener(self, context, listener):
+        loadbalancer = listener['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(listener["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, listener['tenant_id'],
@@ -217,8 +219,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def create_pool(self, context, pool):
+        loadbalancer = pool['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, pool['tenant_id'],
@@ -226,8 +229,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def delete_pool(self, context, pool):
+        loadbalancer = pool['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, pool['tenant_id'],
@@ -235,9 +239,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def create_member(self, context, member):
-        pool = member.get('pool')
+        loadbalancer = member['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, member['tenant_id'],
@@ -245,9 +249,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def delete_member(self, context, member):
-        pool = member.get('pool')
+        loadbalancer = member['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, member['tenant_id'],
@@ -255,9 +259,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def create_healthmonitor_on_pool(self, context, pool_id, healthmonitor):
-        pool = healthmonitor.get('pool')
+        loadbalancer = healthmonitor['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, healthmonitor['tenant_id'],
@@ -265,9 +269,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def create_healthmonitor(self, context, healthmonitor):
-        pool = healthmonitor.get('pool')
+        loadbalancer = healthmonitor['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, healthmonitor['tenant_id'],
@@ -275,9 +279,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
 
     @log_helpers.log_method_call
     def delete_healthmonitor(self, context, healthmonitor):
-        pool = healthmonitor.get('pool')
+        loadbalancer = healthmonitor['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
-        nf_id = self._fetch_nf_from_resource_desc(pool["description"])
+        nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, healthmonitor['tenant_id'],
