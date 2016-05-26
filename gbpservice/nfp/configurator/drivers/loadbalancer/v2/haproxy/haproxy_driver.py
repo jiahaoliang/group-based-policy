@@ -322,13 +322,16 @@ class HaproxyCommonManager(object):
         pass
 
     def create(self, context, obj):
-        LOG.info(_LI("LB %s, create %s"), self.__class__.__name__, obj['id'])
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__, "id": obj['id']})
 
     def update(self, context, old_obj, obj):
-        LOG.info(_LI("LB %s, update %s"), self.__class__.__name__, obj['id'])
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__, "id": obj['id']})
 
     def delete(self, context, obj):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__, obj['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__, "id": obj['id']})
 
 
 class HaproxyLoadBalancerManager(HaproxyCommonManager,
@@ -374,8 +377,9 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         return amphorae_network_config
 
     def create(self, context, loadbalancer):
-        LOG.info(_LI("LB %s, create %s"), self.__class__.__name__,
-                 loadbalancer['id'])
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": loadbalancer['id']})
 
         self.driver.add_amphora(loadbalancer['id'],
                                 loadbalancer['description'])
@@ -388,8 +392,9 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         LOG.info(_LI("Notfied amphora of vip plug"))
 
     def update(self, context, old_loadbalancer, loadbalancer):
-        LOG.info(_LI("LB %s, update %s"), self.__class__.__name__,
-                 loadbalancer['id'])
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": loadbalancer['id']})
         self.driver.add_amphora(loadbalancer['id'],
                                 loadbalancer['description'])
         loadbalancer_o_obj = self.driver.o_models_builder.\
@@ -398,8 +403,9 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
             self.amphora_driver.update(listener, loadbalancer_o_obj.vip)
 
     def delete(self, context, loadbalancer):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__,
-                 loadbalancer['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": loadbalancer['id']})
         # delete loadbalancer doesn't need any operation on service vm
 
     @property
@@ -408,8 +414,9 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
         return False
 
     def create_and_allocate_vip(self, context, obj):
-        LOG.info(_LI("LB %s, create_and_allocate_vip %s"),
-                 self.__class__.__name__, obj['id'])
+        LOG.info(_LI("LB %(cls_name)s, create_and_allocate_vip %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": obj['id']})
         self.create(context, obj)
 
     def refresh(self, context, obj):
@@ -439,18 +446,21 @@ class HaproxyListenerManager(HaproxyCommonManager,
                                           listener_o_obj.load_balancer.vip)
 
     def create(self, context, listener):
-        LOG.info(_LI("LB %s, create %s", self.__class__.__name__,
-                     listener['id']))
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": listener['id']})
         self._deploy(listener)
 
     def update(self, context, old_listener, listener):
-        LOG.info(_LI("LB %s, update %s", self.__class__.__name__,
-                     listener['id']))
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": listener['id']})
         self._deploy(listener)
 
     def delete(self, context, listener):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__,
-                     listener['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": listener['id']})
         self.driver.add_amphora(listener['loadbalancer_id'],
                                 listener['description'])
         listener_o_obj = self.driver.o_models_builder.\
@@ -481,15 +491,21 @@ class HaproxyPoolManager(HaproxyCommonManager,
                                           load_balancer_o_obj.vip)
 
     def create(self, context, pool):
-        LOG.info(_LI("LB %s, create %s"), self.__class__.__name__, pool['id'])
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": pool['id']})
         self._deploy(pool)
 
     def update(self, context, old_pool, pool):
-        LOG.info(_LI("LB %s, update %s"), self.__class__.__name__, pool['id'])
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": pool['id']})
         self._deploy(pool)
 
     def delete(self, context, pool):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__, pool['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": pool['id']})
         self._remove_pool(pool)
         self._deploy(pool)
 
@@ -518,15 +534,21 @@ class HaproxyMemberManager(HaproxyCommonManager,
         default_pool['members'].pop(index_to_remove)
 
     def create(self, context, member):
-        LOG.info(_LI("LB %s, create %s"), self.__class__.__name__, member['id'])
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": member['id']})
         self._deploy(member)
 
     def update(self, context, old_member, member):
-        LOG.info(_LI("LB %s, update %s"), self.__class__.__name__, member['id'])
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": member['id']})
         self._deploy(member)
 
     def delete(self, context, member):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__, member['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": member['id']})
         self._remove_member(member)
         self._deploy(member)
 
@@ -551,14 +573,20 @@ class HaproxyHealthMonitorManager(HaproxyCommonManager,
             default_pool['healthmonitor'] = None
 
     def create(self, context, hm):
-        LOG.info(_LI("LB %s, create %s"), self.__class__.__name__, hm['id'])
+        LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": hm['id']})
         self._deploy(hm)
 
     def update(self, context, old_hm, hm):
-        LOG.info(_LI("LB %s, update %s"), self.__class__.__name__, hm['id'])
+        LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": hm['id']})
         self._deploy(hm)
 
     def delete(self, context, hm):
-        LOG.info(_LI("LB %s, delete %s"), self.__class__.__name__, hm['id'])
+        LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": hm['id']})
         self._remove_healthmonitor(hm)
         self._deploy(hm)
