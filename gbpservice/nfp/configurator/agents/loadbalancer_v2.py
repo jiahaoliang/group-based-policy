@@ -786,7 +786,7 @@ class LBaaSEventHandler(agent_base.AgentBaseEventHandler,
         except Exception:
             if operation == 'delete':
                 msg = ("Failed to delete pool health monitor."
-                         " assoc_id: %s" % (assoc_id))
+                       " assoc_id: %s" % (assoc_id))
                 LOG.warn(msg)
             else:
                 self.plugin_rpc.update_status(
@@ -847,10 +847,12 @@ def events_init(sc, drivers, rpcmgr):
     Returns: None
 
     """
-    ev_ids = [lb_constants.EVENT_CREATE_LOADBALANCER, lb_constants.EVENT_UPDATE_LOADBALANCER,
+    ev_ids = [lb_constants.EVENT_CREATE_LOADBALANCER,
+              lb_constants.EVENT_UPDATE_LOADBALANCER,
               lb_constants.EVENT_DELETE_LOADBALANCER,
 
-              lb_constants.EVENT_CREATE_LISTENER, lb_constants.EVENT_UPDATE_LISTENER,
+              lb_constants.EVENT_CREATE_LISTENER,
+              lb_constants.EVENT_UPDATE_LISTENER,
               lb_constants.EVENT_DELETE_LISTENER,
 
               lb_constants.EVENT_CREATE_POOL, lb_constants.EVENT_UPDATE_POOL,
