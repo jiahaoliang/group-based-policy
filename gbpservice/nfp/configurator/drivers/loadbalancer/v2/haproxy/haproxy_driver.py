@@ -19,7 +19,6 @@ from oslo_log import log as logging
 from neutron_lbaas.drivers import driver_base as n_driver_base
 
 from gbpservice.nfp.common import exceptions
-from gbpservice.nfp.configurator.lib import lbv2_constants
 from gbpservice.nfp.configurator.drivers.base import base_driver
 from gbpservice.nfp.configurator.drivers.loadbalancer.v1.haproxy.\
     haproxy_lb_driver import LbGenericConfigDriver
@@ -28,12 +27,13 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import neutron_lbaas_data_models as n_data_models
 from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     common import data_models as o_data_models
-from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.\
-    rest_api_driver import HaproxyAmphoraLoadBalancerDriver
-from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
-    network import data_models as network_data_models
 from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     common import constants
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
+    network import data_models as network_data_models
+from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.\
+    rest_api_driver import HaproxyAmphoraLoadBalancerDriver
+from gbpservice.nfp.configurator.lib import lbv2_constants
 
 DRIVER_NAME = 'loadbalancerv2'
 
