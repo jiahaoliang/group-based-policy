@@ -974,4 +974,5 @@ def _start_collect_stats(sc):
 
 def init_agent_complete(cm, sc, conf):
     # _start_collect_stats(sc)
-    LOG.info("Initialization of loadbalancer agent v2 completed.")
+    msg = ("Initialization of loadbalancer agent v2 completed.")
+    LOG.info(msg)
