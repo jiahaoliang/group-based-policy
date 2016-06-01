@@ -300,9 +300,9 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     def get_amphora(self, loadbalancer_id):
         return self.amphorae.get(loadbalancer_id)
 
-    def add_amphora(self, loadbalancer_id, descritption,
+    def add_amphora(self, loadbalancer_id, description,
                     status=constants.ACTIVE):
-        sc_metadata = ast.literal_eval(descritption)
+        sc_metadata = ast.literal_eval(description)
         if not (sc_metadata.get('floating_ip')
                 and sc_metadata.get('network_function_id')):
             raise exceptions.IncompleteData(
