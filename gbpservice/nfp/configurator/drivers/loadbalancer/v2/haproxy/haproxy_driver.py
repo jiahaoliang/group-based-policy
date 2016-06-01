@@ -371,8 +371,7 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                     network_data_models.AmphoraNetworkConfig(
                         amphora=amp,
                         vip_subnet=vip_subnet,
-                        vrrp_port=vrrp_port
-                    )
+                        vrrp_port=vrrp_port)
 
         return amphorae_network_config
 
