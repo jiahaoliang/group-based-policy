@@ -389,7 +389,10 @@ class HaproxyLoadBalancerManager(HaproxyCommonManager,
                                      context, loadbalancer, loadbalancer_o_obj)
         self.driver.amphora_driver.post_vip_plug(
                 loadbalancer_o_obj, amphorae_network_config)
-        LOG.info(_LI("Notfied amphora of vip plug"))
+        LOG.info(_LI("Notfied amphora of vip plug. "
+                     "Loadbalancer id: %(id)s, vip: %(vip)s"),
+                 {"id": loadbalancer['id'],
+                  "vip": loadbalancer_o_obj.vip.ip_address})
 
     def update(self, context, old_loadbalancer, loadbalancer):
         LOG.info(_LI("LB %(cls_name)s, update %(id)s"),
