@@ -874,7 +874,7 @@ def events_init(sc, drivers, rpcmgr):
     evs = []
     for ev_id in ev_ids:
         ev = nfp_event.Event(id=ev_id, handler=LBaaSV2EventHandler(
-            sc, drivers,rpcmgr))
+            sc, drivers, rpcmgr))
         evs.append(ev)
     sc.register_events(evs)
 
