@@ -35,24 +35,6 @@ class LBaaSV2RpcSender(data_filter.Filter):
     def __init__(self, sc):
         self.notify = agent_base.AgentBaseNotification(sc)
 
-    # TODO(jiahao): copy from v1 agent need to review
-    def get_logical_device(self, pool_id, context):
-        """ Calls data filter library to get logical device from pool_id.
-
-        :param pool_id: object type
-        :param context: context which has list of all pool related resources
-                        belonging to that tenant
-
-        Returns: logical_device
-        """
-        return self.call(
-            context,
-            self.make_msg(
-                'get_logical_device',
-                pool_id=pool_id
-            )
-        )
-
     def update_status(self, obj_type, obj_id, root_lb_id,
                       provisioning_status, operating_status,
                       agent_info, obj=None):
@@ -83,7 +65,8 @@ class LBaaSV2RpcSender(data_filter.Filter):
                }
         self.notify._notification(msg)
 
-    # TODO(jiahao): copy from v1 agent need to review
+    # TODO(jiahao): need to revisit how lbaasv2 update lb stats,
+    # will add in visibility patch
     def update_pool_stats(self, pool_id, stats, context, pool=None):
         """ Enqueues the response from LBaaS operation to neutron plugin.
 
@@ -99,25 +82,6 @@ class LBaaSV2RpcSender(data_filter.Filter):
                                           'notification_type': (
                                                         'update_pool_stats'),
                                           'pool': pool_id}}]
-               }
-        self.notify._notification(msg)
-
-    # TODO(jiahao): copy from v1 agent need to review
-    def vip_deleted(self, vip, status, agent_info):
-        """ Enqueues the response from LBaaS operation to neutron plugin.
-
-        :param vip: object type
-        :param vip_id: object id
-        :param status: status of the object to be set
-
-        """
-        msg = {'info': {'service_type': lb_const.SERVICE_TYPE,
-                        'context': agent_info['context']},
-               'notification': [{'resource': agent_info['resource'],
-                                 'data': {'vip_id': vip['id'],
-                                          'vip': vip,
-                                          'notification_type': 'vip_deleted',
-                                          'status': status}}]
                }
         self.notify._notification(msg)
 
