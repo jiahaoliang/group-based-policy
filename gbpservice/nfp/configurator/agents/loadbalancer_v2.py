@@ -12,17 +12,16 @@
 
 import os
 
-from oslo_log import log as logging
-
 from gbpservice.nfp.common import exceptions
 from gbpservice.nfp.configurator.agents import agent_base
 from gbpservice.nfp.configurator.lib import data_filter
 from gbpservice.nfp.configurator.lib import lbv2_constants as lb_const
 from gbpservice.nfp.configurator.lib import utils
 from gbpservice.nfp.core import event as nfp_event
+from gbpservice.nfp.core import log as nfp_logging
 from gbpservice.nfp.core import poll as nfp_poll
 
-LOG = logging.getLogger(__name__)
+LOG = nfp_logging.getLogger(__name__)
 
 """ Implements LBaaS response path to Neutron plugin.
 Methods of this class are invoked by the LBaaSV2EventHandler class and also

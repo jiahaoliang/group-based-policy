@@ -150,7 +150,9 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
             _prepare_resource_context_dicts(**args)
 
         nfp_context.update({'neutron_context': ctx_dict,
-                            'requester': 'nas_service'})
+                            'requester': 'nas_service',
+                            'logging_context':
+                                nfp_logging.get_logging_context()})
         resource_type = 'loadbalancerv2'
         resource = name
         resource_data = {'neutron_context': rsrc_ctx_dict}
@@ -184,101 +186,121 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
                             allocate_vip=True):
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, loadbalancer['tenant_id'],
             'loadbalancer', nf,
             loadbalancer=loadbalancer, driver_name=driver_name)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def delete_loadbalancer(self, context, loadbalancer,
                             delete_vip_port=True):
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, loadbalancer['tenant_id'],
             'loadbalancer', nf, loadbalancer=loadbalancer)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def create_listener(self, context, listener):
         loadbalancer = listener['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, listener['tenant_id'],
             'listener', nf, listener=listener)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def delete_listener(self, context, listener):
         loadbalancer = listener['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, listener['tenant_id'],
             'listener', nf, listener=listener)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def create_pool(self, context, pool):
         loadbalancer = pool['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, pool['tenant_id'],
             'pool', nf, pool=pool)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def delete_pool(self, context, pool):
         loadbalancer = pool['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, pool['tenant_id'],
             'pool', nf, pool=pool)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def create_member(self, context, member):
         loadbalancer = member['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, member['tenant_id'],
             'member', nf, member=member)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def delete_member(self, context, member):
         loadbalancer = member['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, member['tenant_id'],
             'member', nf, member=member)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def create_healthmonitor(self, context, healthmonitor):
         loadbalancer = healthmonitor['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._post(
             context, healthmonitor['tenant_id'],
             'healthmonitor', nf, healthmonitor=healthmonitor)
+        nfp_logging.clear_logging_context()
 
     @log_helpers.log_method_call
     def delete_healthmonitor(self, context, healthmonitor):
         loadbalancer = healthmonitor['pool']['loadbalancer']
         # Fetch nf_id from description of the resource
         nf_id = self._fetch_nf_from_resource_desc(loadbalancer["description"])
+        nfp_logging.store_logging_context(meta_id=nf_id)
         nf = common.get_network_function_details(context, nf_id)
         self._delete(
             context, healthmonitor['tenant_id'],
             'healthmonitor', nf, healthmonitor=healthmonitor)
+        nfp_logging.clear_logging_context()
 
     # TODO(jiahao): L7policy support not implemented
     # disable L7policy
