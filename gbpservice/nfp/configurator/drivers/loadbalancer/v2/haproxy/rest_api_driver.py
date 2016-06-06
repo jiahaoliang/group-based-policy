@@ -16,6 +16,7 @@
 import functools
 import hashlib
 import time
+
 import requests
 import six
 from stevedore import driver as stevedore_driver
