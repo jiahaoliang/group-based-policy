@@ -15,7 +15,6 @@ import copy
 
 from neutron._i18n import _LI
 from neutron_lbaas.drivers import driver_base as n_driver_base
-from oslo_log import log as logging
 
 from gbpservice.nfp.common import exceptions
 from gbpservice.nfp.configurator.drivers.base import base_driver
@@ -32,10 +31,11 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.\
 from gbpservice.nfp.configurator.lib import constants as common_const
 from gbpservice.nfp.configurator.lib import lb_constants
 from gbpservice.nfp.configurator.lib import lbv2_constants
+from gbpservice.nfp.core import log as nfp_logging
 
 DRIVER_NAME = 'loadbalancerv2'
 
-LOG = logging.getLogger(__name__)
+LOG = nfp_logging.getLogger(__name__)
 
 
 # Copy from loadbalancer/v1/haproxy/haproxy_lb_driver.py
@@ -346,6 +346,10 @@ class HaproxyLoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
         self.member = HaproxyMemberManager(self)
         self.health_monitor = HaproxyHealthMonitorManager(self)
         self.o_models_builder = OctaviaDataModelBuilder(self)
+
+    @classmethod
+    def get_name(self):
+        return DRIVER_NAME
 
     # Get Amphora object given the loadbalancer_id
     def get_amphora(self, loadbalancer_id):

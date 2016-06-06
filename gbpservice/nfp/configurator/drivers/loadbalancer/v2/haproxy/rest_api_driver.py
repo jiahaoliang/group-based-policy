@@ -16,11 +16,11 @@
 import functools
 import hashlib
 import time
-
-from oslo_log import log as logging
 import requests
 import six
 from stevedore import driver as stevedore_driver
+
+from oslo_config import cfg
 
 from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     amphorae.driver_exceptions import exceptions as driver_except
@@ -39,10 +39,10 @@ from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     common.tls_utils import cert_parser
 from gbpservice.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
     i18n import _LW
+from gbpservice.nfp.core import log as nfp_logging
 
-from oslo_config import cfg
 
-LOG = logging.getLogger(__name__)
+LOG = nfp_logging.getLogger(__name__)
 
 haproxy_amphora_opts = [
     cfg.StrOpt('base_path',
