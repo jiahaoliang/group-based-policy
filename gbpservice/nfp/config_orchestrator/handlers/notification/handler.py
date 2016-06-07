@@ -188,14 +188,17 @@ class LoadbalancerV2Notifier(object):
         self._sc = sc
         self._conf = conf
 
-    # TODO(jiahao): need to change logging
     def update_status(self, context, notification_data):
         notification = notification_data['notification'][0]
-        notification_info = notification_data['info']
+
+        request_info = notification_data.get('info')
+        request_context = request_info.get('context')
+        logging_context = request_context.get('logging_context')
+        nfp_logging.store_logging_context(**logging_context)
+
         resource_data = notification['data']
         obj_type = resource_data['obj_type']
         obj_id = resource_data['obj_id']
-        service_type = notification_info['service_type']
 
         rpcClient = transport.RPCClient(a_topics.LBV2_NFP_PLUGIN_TOPIC)
         rpcClient.cctxt = rpcClient.client.prepare(
@@ -231,6 +234,7 @@ class LoadbalancerV2Notifier(object):
                              obj_id=resource_data['root_lb_id'],
                              provisioning_status=lb_p_status,
                              operating_status=lb_o_status)
+        nfp_logging.clear_logging_context()
 
     # TODO(jiahao): implememnt later
     def update_loadbalancer_stats(self, context, loadbalancer_id, stats_data):
