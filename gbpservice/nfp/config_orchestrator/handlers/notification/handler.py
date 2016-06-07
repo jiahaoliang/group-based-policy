@@ -11,6 +11,8 @@
 #    under the License.
 
 from gbpservice.nfp.common import constants as const
+from gbpservice.nfp.config_orchestrator.common import lbv2_constants \
+    as lbv2_const
 from gbpservice.nfp.config_orchestrator.common import topics as a_topics
 from gbpservice.nfp.core import log as nfp_logging
 from gbpservice.nfp.lib import transport
@@ -219,31 +221,16 @@ class LoadbalancerV2Notifier(object):
                                  provisioning_status=obj_p_status,
                                  operating_status=obj_o_status)
         else:
-            lb_o_status = const.ONLINE
+            lb_o_status = lbv2_const.ONLINE
             if obj_p_status == const.ERROR:
                 lb_p_status = const.ERROR
-                lb_o_status = const.OFFLINE
+                lb_o_status = lbv2_const.OFFLINE
 
         rpcClient.cctxt.cast(context, 'update_status',
                              obj_type='loadbalancer',
                              obj_id=resource_data['root_lb_id'],
                              provisioning_status=lb_p_status,
                              operating_status=lb_o_status)
-
-        if obj_type.lower() == 'loadbalancer':
-            nf_id = notification_info['context']['network_function_id']
-            lb_id = notification_info['context']['loadbalancer_id']
-            # sending notification to visibility
-            event_data = {'context': context.to_dict(),
-                          'nf_id': nf_id,
-                          'loadbalancer_id': lb_id,
-                          'service_type': service_type,
-                          'resource_id': lb_id
-                          }
-            ev = self._sc.new_event(id='SERVICE_CREATE_PENDING',
-                                    key='SERVICE_CREATE_PENDING',
-                                    data=event_data, max_times=24)
-            self._sc.poll_event(ev)
 
     # TODO(jiahao): implememnt later
     def update_loadbalancer_stats(self, context, loadbalancer_id, stats_data):

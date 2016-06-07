@@ -25,13 +25,6 @@ import oslo_messaging as messaging
 
 LOG = nfp_logging.getLogger(__name__)
 
-# Constants to extend status strings in neutron.plugins.common.constants
-ONLINE = 'ONLINE'
-OFFLINE = 'OFFLINE'
-DEGRADED = 'DEGRADED'
-DISABLED = 'DISABLED'
-NO_MONITOR = 'NO_MONITOR'
-
 """
 RPC handler for Loadbalancer service
 """
