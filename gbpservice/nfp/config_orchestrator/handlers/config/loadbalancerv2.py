@@ -60,12 +60,35 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
             ret_list.append(obj.to_api_dict())
         return ret_list
 
+    def _filter_data(self, routers, networks, filters):
+        # filter routers and networks data and formulate
+        # dictionary of subnets, routers and ports for the
+        # given tenant.
+        tenant_id = filters['tenant_id'][0]
+        _filtered_subnets = []
+        _filtered_ports = []
+        for network in networks:
+            subnets = network['subnets']
+            ports = network['ports']
+            for subnet in subnets:
+                if subnet['tenant_id'] == tenant_id:
+                    _filtered_subnets.append(subnet)
+            for port in ports:
+                if port['tenant_id'] == tenant_id:
+                    _filtered_ports.append(port)
+
+        return {'subnets': _filtered_subnets,
+                'ports': _filtered_ports}
+
     def _get_core_context(self, context, tenant_id):
         filters = {'tenant_id': [tenant_id]}
-        core_context_dict = common.get_core_context(context,
-                                                    filters,
-                                                    self._conf.host)
-        del core_context_dict['routers']
+        # core_context_dict = common.get_core_context(context,
+        #                                             filters,
+        #                                             self._conf.host)
+        # del core_context_dict['routers']
+        routers = []
+        networks = common.get_networks(context, self._conf.host)
+        core_context_dict = self._filter_data(routers, networks, filters)
         return core_context_dict
 
     def _get_lb_context(self, context, filters):
