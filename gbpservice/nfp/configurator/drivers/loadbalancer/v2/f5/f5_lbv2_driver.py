@@ -242,7 +242,7 @@ class F5LoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     service_vendor = 'f5networks'
 
     def __init__(self, plugin_rpc=None, conf=None):
-        self.conf.register_opts(OPTS)
+        conf.register_opts(OPTS)
         self.cache = f5_agent.LogicalServiceCache()
         self.lbdriver = iControlDriver(conf)
 
