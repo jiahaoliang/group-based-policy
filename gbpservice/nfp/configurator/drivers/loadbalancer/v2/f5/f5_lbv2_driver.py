@@ -12,6 +12,7 @@
 
 from neutron._i18n import _LI
 from neutron_lbaas.drivers import driver_base as n_driver_base
+from oslo_config import cfg
 
 from f5lbaasdriver.v2.bigip.service_builder import LBaaSv2ServiceBuilder
 from f5_openstack_agent.lbaasv2.drivers.bigip import agent_manager as f5_agent
@@ -26,6 +27,78 @@ from gbpservice.nfp.configurator.lib import lbv2_constants
 from gbpservice.nfp.core import log as nfp_logging
 
 LOG = nfp_logging.getLogger(__name__)
+
+
+OPTS = [
+    cfg.StrOpt(  # XXX should we use this with internal classes?
+        'f5_bigip_lbaas_device_driver',  # XXX maybe remove "device" and "f5"?
+        default=('f5_openstack_agent.lbaasv2.drivers.bigip.icontrol_driver.'
+                 'iControlDriver'),
+        help=('The driver used to provision BigIPs')
+    ),
+    cfg.BoolOpt(
+        'l2_population',
+        default=False,
+        help=('Use L2 Populate service for fdb entries on the BIG-IP')
+    ),
+    cfg.BoolOpt(
+        'f5_global_routed_mode',
+        default=True,
+        help=('Disable all L2 and L3 integration in favor of global routing')
+    ),
+    cfg.BoolOpt(
+        'use_namespaces',
+        default=True,
+        help=('Allow overlapping IP addresses for tenants')
+    ),
+    cfg.BoolOpt(
+        'f5_snat_mode',
+        default=True,
+        help=('use SNATs, not direct routed mode')
+    ),
+    cfg.IntOpt(
+        'f5_snat_addresses_per_subnet',
+        default=1,
+        help=('Interface and VLAN for the VTEP overlay network')
+    ),
+    cfg.StrOpt(
+        'static_agent_configuration_data',
+        default=None,
+        help=('static name:value entries to add to the agent configurations')
+    ),
+    cfg.IntOpt(
+        'service_resync_interval',
+        default=300,
+        help=('Number of seconds between service refresh checks')
+    ),
+    cfg.StrOpt(
+        'environment_prefix',
+        default='Project',
+        help=('The object name prefix for this environment')
+    ),
+    cfg.BoolOpt(
+        'environment_specific_plugin',
+        default=True,
+        help=('Use environment specific plugin topic')
+    ),
+    cfg.IntOpt(
+        'environment_group_number',
+        default=1,
+        help=('Agent group number for the environment')
+    ),
+    cfg.DictOpt(
+        'capacity_policy',
+        default={},
+        help=('Metrics to measure capacity and their limits')
+    ),
+    # FIXME(RJB): This is a test option REMOVE
+    cfg.BoolOpt(
+        'service_sync',
+        default=True,
+        help=('perform the operations associated with service validation')
+    )
+]
+
 
 # Copy from loadbalancer/v1/haproxy/haproxy_lb_driver.py
 """ Loadbalancer generic configuration driver for handling device
@@ -169,6 +242,7 @@ class F5LoadBalancerDriver(n_driver_base.LoadBalancerBaseDriver,
     service_vendor = 'f5networks'
 
     def __init__(self, plugin_rpc=None, conf=None):
+        self.conf.register_opts(OPTS)
         self.cache = f5_agent.LogicalServiceCache()
         self.lbdriver = iControlDriver(conf)
 
