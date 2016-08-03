@@ -81,6 +81,11 @@ class LbGenericConfigDriver(object):
 
 
 # Monkey patching lbaasv2 plugin for f5 service_builder
+class MonkeyPatch(object):
+    def __init__(self):
+        pass
+
+
 class LoadBalancerPluginv2(object):
 
     def __init__(self):
@@ -88,8 +93,8 @@ class LoadBalancerPluginv2(object):
         # we get info from the loadbalancer object
         self.loadbalancer = None
 
-        self.db = object()
-        self.db._core_plugin = object()
+        self.db = MonkeyPatch()
+        self.db._core_plugin = MonkeyPatch()
 
         self.db.get_listeners = self.get_listeners
         self.db.get_pool = self.get_pool
@@ -230,10 +235,35 @@ class F5LoadBalancerManager(F5CommonManager,
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.delete_loadbalancer(loadbalancer, service)
-        self.driver.cache.put(service, agent_host="default")
+        self.cache.remove_by_loadbalancer_id(loadbalancer['id'])
         LOG.info(_LI("LB %(cls_name)s, delete %(id)s"),
                  {"cls_name": self.__class__.__name__,
                   "id": loadbalancer['id']})
+
+    @property
+    def allocates_vip(self):
+        LOG.info(_LI('allocates_vip queried'))
+        return False
+
+    def create_and_allocate_vip(self, context, obj):
+        LOG.info(_LI("LB %(cls_name)s, create_and_allocate_vip %(id)s"),
+                 {"cls_name": self.__class__.__name__,
+                  "id": obj['id']})
+        self.create(context, obj)
+
+    def refresh(self, context, obj):
+        # This is intended to trigger the backend to check and repair
+        # the state of this load balancer and all of its dependent objects
+        LOG.info(_LI("LB pool refresh %s"), obj['id'])
+
+    def stats(self, context, lb_obj):
+        LOG.info(_LI("LB stats %s"), lb_obj['id'])
+        return {
+            "bytes_in": 0,
+            "bytes_out": 0,
+            "active_connections": 0,
+            "total_connections": 0
+        }
 
 
 class F5ListenerManager(F5CommonManager,
