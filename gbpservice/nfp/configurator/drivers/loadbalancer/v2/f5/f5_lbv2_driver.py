@@ -194,7 +194,7 @@ class LoadBalancerPluginv2(object):
         for pool in self.loadbalancer.pools:
             if pool.id == id:
                 return pool.members
-        return None
+        return []
 
     def get_healthmonitor(self, context, id):
         for pool in self.loadbalancer.pools:
