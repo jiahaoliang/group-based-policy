@@ -385,7 +385,7 @@ class F5PoolManager(F5CommonManager,
 
     def create(self, context, pool):
         pool_obj = n_data_models.Pool.from_dict(pool)
-        loadbalancer_obj = pool_obj.listener.loadbalancer
+        loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.create_pool(pool, service)
         self.driver.cache.put(service, agent_host="default")
@@ -395,7 +395,7 @@ class F5PoolManager(F5CommonManager,
 
     def update(self, context, old_pool, pool):
         pool_obj = n_data_models.Pool.from_dict(pool)
-        loadbalancer_obj = pool_obj.listener.loadbalancer
+        loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.update_pool(pool, service)
         self.driver.cache.put(service, agent_host="default")
@@ -405,7 +405,7 @@ class F5PoolManager(F5CommonManager,
 
     def delete(self, context, pool):
         pool_obj = n_data_models.Pool.from_dict(pool)
-        loadbalancer_obj = pool_obj.listener.loadbalancer
+        loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.delete_pool(pool, service)
         self.driver.cache.put(service, agent_host="default")
@@ -418,7 +418,7 @@ class F5MemberManager(F5CommonManager,
 
     def create(self, context, member):
         member_obj = n_data_models.Member.from_dict(member)
-        loadbalancer_obj = member_obj.pool.listener.loadbalancer
+        loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.create_member(member, service)
         self.driver.cache.put(service, agent_host="default")
@@ -428,7 +428,7 @@ class F5MemberManager(F5CommonManager,
 
     def update(self, context, old_member, member):
         member_obj = n_data_models.Member.from_dict(member)
-        loadbalancer_obj = member_obj.pool.listener.loadbalancer
+        loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.update_member(member, service)
         self.driver.cache.put(service, agent_host="default")
@@ -438,7 +438,7 @@ class F5MemberManager(F5CommonManager,
 
     def delete(self, context, member):
         member_obj = n_data_models.Member.from_dict(member)
-        loadbalancer_obj = member_obj.pool.listener.loadbalancer
+        loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.delete_member(member, service)
         self.driver.cache.put(service, agent_host="default")
@@ -452,8 +452,8 @@ class F5HealthMonitorManager(F5CommonManager,
 
     def create(self, context, health_monitor):
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
-        loadbalancer_obj = hm_obj.pool.listener.loadbalancer
-        sservice = self.driver.build_service(context, loadbalancer_obj)
+        loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
+        service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.create_health_monitor(health_monitor, service)
         self.driver.cache.put(service, agent_host="default")
         LOG.info(_LI("LB %(cls_name)s, create %(id)s"),
@@ -462,7 +462,7 @@ class F5HealthMonitorManager(F5CommonManager,
 
     def update(self, context, old_health_monitor, health_monitor):
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
-        loadbalancer_obj = hm_obj.pool.listener.loadbalancer
+        loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.update_health_monitor(health_monitor, service)
         self.driver.cache.put(service, agent_host="default")
@@ -472,7 +472,7 @@ class F5HealthMonitorManager(F5CommonManager,
 
     def delete(self, context, health_monitor):
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
-        loadbalancer_obj = hm_obj.pool.listener.loadbalancer
+        loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.delete_health_monitor(health_monitor, service)
         self.driver.cache.put(service, agent_host="default")
