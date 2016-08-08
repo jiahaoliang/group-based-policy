@@ -441,6 +441,11 @@ class Pool(BaseDataModel):
         model_dict['l7_policies'] = [L7Policy.from_dict(policy)
                                      for policy in l7_policies]
 
+        # Note(jiahao): handle old attribute for out of tree drivers
+        listener = model_dict.pop('listener', None)
+        if listener:
+            model_dict['listener'] = Listener.from_dict(listener)
+
         if healthmonitor:
             model_dict['healthmonitor'] = HealthMonitor.from_dict(
                 healthmonitor)
