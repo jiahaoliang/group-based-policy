@@ -204,12 +204,18 @@ class LoadBalancerPluginv2(object):
 
     def get_ports(self, context, filters=None):
         ports = []
-        subnet_id = filter['fixed_ips']['subnet_id'][0]
-        ip_address = filter['fixed_ips']['ip_address'][0]
-        for port in context['service_info']['ports']:
-            if (port['fixed_ips'][0]['subnet_id'] == subnet_id and
-                    port['fixed_ips'][0]['ip_address'] == ip_address):
-                ports.append(port)
+        if filters.get('fixed_ips'):
+            subnet_id = filters['fixed_ips']['subnet_id'][0]
+            ip_address = filters['fixed_ips']['ip_address'][0]
+            for port in context['service_info']['ports']:
+                if (port['fixed_ips'][0]['subnet_id'] == subnet_id and
+                        port['fixed_ips'][0]['ip_address'] == ip_address):
+                    ports.append(port)
+        elif filters.get('network_id'):
+            network_ids = filters['network_id']
+            for port in context['service_info']['ports']:
+                if port['network_id'] in network_ids:
+                    ports.append(port)
         return ports
 
     def get_port(self, context, id):
