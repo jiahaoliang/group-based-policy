@@ -10,6 +10,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
+
 from neutron._i18n import _LI
 from neutron_lbaas.drivers import driver_base as n_driver_base
 from oslo_config import cfg
@@ -294,6 +296,8 @@ class F5LoadBalancerManager(F5CommonManager,
                             n_driver_base.BaseLoadBalancerManager):
 
     def create(self, context, loadbalancer):
+        # Must use a copy because from_dict will modify the original dict
+        loadbalancer = copy.deepcopy(loadbalancer)
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.create_loadbalancer(loadbalancer, service)
@@ -303,6 +307,8 @@ class F5LoadBalancerManager(F5CommonManager,
                   "id": loadbalancer['id']})
 
     def update(self, context, old_loadbalancer, loadbalancer):
+        # Must use a copy because from_dict will modify the original dict
+        loadbalancer = copy.deepcopy(loadbalancer)
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.update_loadbalancer(loadbalancer, service)
@@ -312,6 +318,8 @@ class F5LoadBalancerManager(F5CommonManager,
                   "id": loadbalancer['id']})
 
     def delete(self, context, loadbalancer):
+        # Must use a copy because from_dict will modify the original dict
+        loadbalancer = copy.deepcopy(loadbalancer)
         loadbalancer_obj = n_data_models.LoadBalancer.from_dict(loadbalancer)
         service = self.driver.build_service(context, loadbalancer_obj)
         self.driver.lbdriver.delete_loadbalancer(loadbalancer, service)
@@ -350,6 +358,8 @@ class F5ListenerManager(F5CommonManager,
                         n_driver_base.BaseListenerManager):
 
     def create(self, context, listener):
+        # Must use a copy because from_dict will modify the original dict
+        listener = copy.deepcopy(listener)
         listener_obj = n_data_models.Listener.from_dict(listener)
         loadbalancer_obj = listener_obj.loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -360,6 +370,8 @@ class F5ListenerManager(F5CommonManager,
                   "id": listener['id']})
 
     def update(self, context, old_listener, listener):
+        # Must use a copy because from_dict will modify the original dict
+        listener = copy.deepcopy(listener)
         listener_obj = n_data_models.Listener.from_dict(listener)
         loadbalancer_obj = listener_obj.loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -370,6 +382,8 @@ class F5ListenerManager(F5CommonManager,
                   "id": listener['id']})
 
     def delete(self, context, listener):
+        # Must use a copy because from_dict will modify the original dict
+        listener = copy.deepcopy(listener)
         listener_obj = n_data_models.Listener.from_dict(listener)
         loadbalancer_obj = listener_obj.loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -384,6 +398,8 @@ class F5PoolManager(F5CommonManager,
                     n_driver_base.BasePoolManager):
 
     def create(self, context, pool):
+        # Must use a copy because from_dict will modify the original dict
+        pool = copy.deepcopy(pool)
         pool_obj = n_data_models.Pool.from_dict(pool)
         loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -394,6 +410,8 @@ class F5PoolManager(F5CommonManager,
                   "id": pool['id']})
 
     def update(self, context, old_pool, pool):
+        # Must use a copy because from_dict will modify the original dict
+        pool = copy.deepcopy(pool)
         pool_obj = n_data_models.Pool.from_dict(pool)
         loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -404,6 +422,8 @@ class F5PoolManager(F5CommonManager,
                   "id": pool['id']})
 
     def delete(self, context, pool):
+        # Must use a copy because from_dict will modify the original dict
+        pool = copy.deepcopy(pool)
         pool_obj = n_data_models.Pool.from_dict(pool)
         loadbalancer_obj = pool_obj.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -417,6 +437,8 @@ class F5MemberManager(F5CommonManager,
                       n_driver_base.BaseMemberManager):
 
     def create(self, context, member):
+        # Must use a copy because from_dict will modify the original dict
+        member = copy.deepcopy(member)
         member_obj = n_data_models.Member.from_dict(member)
         loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -427,6 +449,8 @@ class F5MemberManager(F5CommonManager,
                   "id": member['id']})
 
     def update(self, context, old_member, member):
+        # Must use a copy because from_dict will modify the original dict
+        member = copy.deepcopy(member)
         member_obj = n_data_models.Member.from_dict(member)
         loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -437,6 +461,8 @@ class F5MemberManager(F5CommonManager,
                   "id": member['id']})
 
     def delete(self, context, member):
+        # Must use a copy because from_dict will modify the original dict
+        member = copy.deepcopy(member)
         member_obj = n_data_models.Member.from_dict(member)
         loadbalancer_obj = member_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -451,6 +477,8 @@ class F5HealthMonitorManager(F5CommonManager,
                              n_driver_base.BaseHealthMonitorManager):
 
     def create(self, context, health_monitor):
+        # Must use a copy because from_dict will modify the original dict
+        health_monitor = copy.deepcopy(health_monitor)
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
         loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -461,6 +489,8 @@ class F5HealthMonitorManager(F5CommonManager,
                   "id": health_monitor['id']})
 
     def update(self, context, old_health_monitor, health_monitor):
+        # Must use a copy because from_dict will modify the original dict
+        health_monitor = copy.deepcopy(health_monitor)
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
         loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
@@ -471,6 +501,8 @@ class F5HealthMonitorManager(F5CommonManager,
                   "id": health_monitor['id']})
 
     def delete(self, context, health_monitor):
+        # Must use a copy because from_dict will modify the original dict
+        health_monitor = copy.deepcopy(health_monitor)
         hm_obj = n_data_models.HealthMonitor.from_dict(health_monitor)
         loadbalancer_obj = hm_obj.pool.listeners[0].loadbalancer
         service = self.driver.build_service(context, loadbalancer_obj)
