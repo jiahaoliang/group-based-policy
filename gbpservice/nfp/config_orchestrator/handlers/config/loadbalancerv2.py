@@ -78,7 +78,8 @@ class Lbv2Agent(loadbalancer_dbv2.LoadBalancerPluginDbv2):
                     _filtered_ports.append(port)
 
         return {'subnets': _filtered_subnets,
-                'ports': _filtered_ports}
+                'ports': _filtered_ports,
+                'networks': networks}
 
     def _get_core_context(self, context, tenant_id):
         filters = {'tenant_id': [tenant_id]}
