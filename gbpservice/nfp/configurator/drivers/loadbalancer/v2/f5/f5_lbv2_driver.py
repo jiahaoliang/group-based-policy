@@ -194,7 +194,7 @@ class LoadBalancerPluginv2(object):
     def get_pool_members(self, context, filters=None):
         pool_id = filters['pool_id'][0]
         for pool in self.loadbalancer.pools:
-            if pool.id == id:
+            if pool.id == pool_id:
                 return pool.members
         return []
 
