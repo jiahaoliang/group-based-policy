@@ -13,21 +13,21 @@
 import ast
 import copy
 
-from gbpservice.nfp.common import exceptions
 from gbpservice.contrib.nfp.configurator.drivers.base import base_driver
 from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.\
     v2.haproxy import neutron_lbaas_data_models as n_data_models
-from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
-    common import data_models as o_data_models
-from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
-    common import constants
-from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.v2.haproxy.octavia_lib.\
-    network import data_models as network_data_models
-from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.v2.haproxy.\
-    rest_api_driver import HaproxyAmphoraLoadBalancerDriver
+from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.\
+    v2.haproxy.octavia_lib.common import data_models as o_data_models
+from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.\
+    v2.haproxy.octavia_lib.common import constants
+from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.\
+    v2.haproxy.octavia_lib.network import data_models as network_data_models
+from gbpservice.contrib.nfp.configurator.drivers.loadbalancer.\
+    v2.haproxy.rest_api_driver import HaproxyAmphoraLoadBalancerDriver
 from gbpservice.contrib.nfp.configurator.lib import constants as common_const
 from gbpservice.contrib.nfp.configurator.lib import lb_constants
 from gbpservice.contrib.nfp.configurator.lib import lbv2_constants
+from gbpservice.nfp.common import exceptions
 from gbpservice.nfp.core import log as nfp_logging
 
 DRIVER_NAME = 'loadbalancerv2'
