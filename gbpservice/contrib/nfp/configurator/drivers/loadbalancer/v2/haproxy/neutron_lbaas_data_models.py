@@ -702,4 +702,3 @@ class LoadBalancer(BaseDataModel):
             model_dict['provider'] = ProviderResourceAssociation.from_dict(
                 provider)
         return super(LoadBalancer, cls).from_dict(model_dict)
-
