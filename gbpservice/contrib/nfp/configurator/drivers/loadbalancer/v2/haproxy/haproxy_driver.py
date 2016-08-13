@@ -321,9 +321,7 @@ class HaproxyLoadBalancerDriver(LbGenericConfigDriver,
     #                                 lb_network_ip, id, status)]}
     amphorae = {}
 
-    def __init__(self, plugin_rpc=None, conf=None):
-        super(HaproxyLoadBalancerDriver, self).__init__(plugin_rpc)
-
+    def __init__(self, conf=None):
         # Each of the major LBaaS objects in the neutron database
         # need a corresponding manager/handler class.
         #
