@@ -367,6 +367,9 @@ class HaproxyLoadBalancerDriver(LbGenericConfigDriver,
 
 class HaproxyCommonManager(object):
 
+    def __init__(self, driver):
+        self.driver = driver
+
     def _deploy(self, obj):
         pass
 
